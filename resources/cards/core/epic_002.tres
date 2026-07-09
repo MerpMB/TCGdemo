@@ -1,0 +1,18 @@
+﻿[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_id = "epic_002"
+display_name = "Epic Card 2"
+card_set = "Core Set"
+description = "Placeholder description for Epic Card 2."
+rarity = 2
+variant = 0
+frame = "epic"
+card_back = "default"
+artist = ""
+flavor_text = ""
+tags = PackedStringArray("core")
+future_stats = {}

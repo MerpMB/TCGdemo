@@ -1,0 +1,239 @@
+[gd_scene load_steps=2 format=3 uid="uid://bqx8cardscene01"]
+
+[ext_resource type="Script" path="res://scripts/ui/card_scene.gd" id="1_card"]
+
+[node name="Card" type="Control"]
+custom_minimum_size = Vector2(140, 200)
+layout_mode = 3
+anchors_preset = 0
+clip_contents = true
+script = ExtResource("1_card")
+
+[node name="FlipButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true
+
+[node name="FlipPivot" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="RarityGlow" type="ColorRect" parent="FlipPivot"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.18, 0.72, 0.32, 0)
+
+[node name="BackFace" type="Panel" parent="FlipPivot"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="BackLabel" type="Label" parent="FlipPivot/BackFace"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -48.0
+offset_top = -20.0
+offset_right = 48.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 22
+text = "TCG"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="FrontFace" type="Control" parent="FlipPivot"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="FramePanel" type="Panel" parent="FlipPivot/FrontFace"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Margin" type="MarginContainer" parent="FlipPivot/FrontFace/FramePanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="VBox" type="VBoxContainer" parent="FlipPivot/FrontFace/FramePanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ArtArea" type="ColorRect" parent="FlipPivot/FrontFace/FramePanel/Margin/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 72)
+layout_mode = 2
+color = Color(0.18, 0.72, 0.32, 1)
+
+[node name="CardNameLabel" type="Label" parent="FlipPivot/FrontFace/FramePanel/Margin/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Card Name"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="RarityLabel" type="Label" parent="FlipPivot/FrontFace/FramePanel/Margin/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Common"
+horizontal_alignment = 1
+
+[node name="VariantLabel" type="Label" parent="FlipPivot/FrontFace/FramePanel/Margin/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Normal"
+horizontal_alignment = 1
+
+[node name="CardIdLabel" type="Label" parent="FlipPivot/FrontFace/FramePanel/Margin/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+text = "common_001"
+horizontal_alignment = 1
+vertical_alignment = 2
+
+[node name="VariantOverlay" type="Control" parent="FlipPivot/FrontFace"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="NegativeOverlay" type="ColorRect" parent="FlipPivot/FrontFace/VariantOverlay"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.02, 0.02, 0.04, 0.55)
+
+[node name="DiamondGlow" type="ColorRect" parent="FlipPivot/FrontFace/VariantOverlay"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.2, 0.55, 0.95, 0.22)
+
+[node name="FoilShine" type="ColorRect" parent="FlipPivot/FrontFace/VariantOverlay"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 0
+offset_left = -40.0
+offset_top = 0.0
+offset_right = 12.0
+offset_bottom = 200.0
+mouse_filter = 2
+color = Color(1, 1, 1, 0.35)
+
+[node name="AltArtIcon" type="Label" parent="FlipPivot/FrontFace/VariantOverlay"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -28.0
+offset_top = 6.0
+offset_right = -6.0
+offset_bottom = 26.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 12
+text = "AA"
+horizontal_alignment = 2
+
+[node name="DiamondIcon" type="Label" parent="FlipPivot/FrontFace/VariantOverlay"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 6.0
+offset_top = -24.0
+offset_right = 26.0
+offset_bottom = -6.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.45, 0.78, 1, 1)
+text = "◆"
+
+[node name="LegendarySpark" type="ColorRect" parent="FlipPivot/FrontFace"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.95, 0.78, 0.18, 0.55)
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+unique_name_in_owner = true
+
+[node name="AudioFlip" type="AudioStreamPlayer" parent="."]
+unique_name_in_owner = true
+
+[node name="AudioRareReveal" type="AudioStreamPlayer" parent="."]
+unique_name_in_owner = true
+
+[node name="AudioLegendaryReveal" type="AudioStreamPlayer" parent="."]
+unique_name_in_owner = true

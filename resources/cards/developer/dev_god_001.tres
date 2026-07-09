@@ -1,0 +1,18 @@
+﻿[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_id = "dev_god_001"
+display_name = "God Mode"
+card_set = "Developer Set"
+description = "For testing only."
+rarity = 3
+variant = 0
+frame = "legendary"
+card_back = "developer"
+artist = ""
+flavor_text = ""
+tags = PackedStringArray("developer", "debug")
+future_stats = {}

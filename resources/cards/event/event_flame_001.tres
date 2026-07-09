@@ -1,0 +1,18 @@
+﻿[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_id = "event_flame_001"
+display_name = "Flame Dancer"
+card_set = "Event Set"
+description = "A limited event card."
+rarity = 1
+variant = 0
+frame = "rare"
+card_back = "event"
+artist = ""
+flavor_text = ""
+tags = PackedStringArray("event", "limited")
+future_stats = {}

@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="PackConfig" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/pack_config.gd" id="1_packconfig"]
+[ext_resource type="PackedScene" uid="uid://packscene01" path="res://scenes/Pack.tscn" id="2_packscene"]
+
+[resource]
+script = ExtResource("1_packconfig")
+pack_id = "event_pack"
+display_name = "Event Pack"
+cards_per_pack = 7
+rarity_weights = {
+0: 50.0,
+1: 30.0,
+2: 15.0,
+3: 5.0
+}
+variant_weights = {
+0: 80.0,
+1: 10.0,
+2: 4.0,
+3: 4.0,
+4: 2.0
+}
+pack_scene = ExtResource("2_packscene")
+primary_color = Color(0.62, 0.18, 0.28, 1)
+accent_color = Color(0.98, 0.42, 0.52, 1)
+description = "Limited-time event pack with themed cards."

@@ -1,0 +1,18 @@
+﻿[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/card_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+card_id = "common_005"
+display_name = "Common Card 5"
+card_set = "Core Set"
+description = "Placeholder description for Common Card 5."
+rarity = 0
+variant = 0
+frame = "common"
+card_back = "default"
+artist = ""
+flavor_text = ""
+tags = PackedStringArray("core")
+future_stats = {}
