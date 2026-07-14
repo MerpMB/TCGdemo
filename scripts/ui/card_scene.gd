@@ -211,14 +211,14 @@ func _apply_frame() -> void:
 		)
 
 
-## Full-bleed artwork is the bottom layer of the front face. The opaque CardBody
-## sits behind the front so any alpha in the artwork blends over a neutral dark
-## base (never a bright rarity color), preventing washed-out artwork. When a
-## card has no artwork, the body falls back to the rarity color.
+## Full-bleed artwork is the bottom layer of the front face. CardBody is a
+## fallback only: shown with the rarity color when artwork is missing, hidden
+## when artwork is present so overlays never reserve or replace art space.
 func _apply_artwork() -> void:
 	var has_art := _card_data.artwork != null
 	_art_texture.texture = _card_data.artwork
 	_art_texture.visible = has_art
+	_card_body.visible = not has_art
 	if has_art:
 		_card_body.color = CARD_BODY_COLOR
 	else:
