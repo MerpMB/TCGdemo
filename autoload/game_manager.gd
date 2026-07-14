@@ -9,14 +9,14 @@ const SCENE_DECK_BUILDER := "res://scenes/DeckBuilder.tscn"
 const SCENE_SETTINGS := "res://scenes/Settings.tscn"
 
 const DEVELOPER_PANEL_SCENE := preload("res://scenes/DeveloperPanel.tscn")
-const CARD_INSPECTOR_SCENE := preload("res://scenes/CardInspector.tscn")
+const CARD_VIEWER_SCENE := preload("res://scenes/CardViewer.tscn")
 
 const FADE_DURATION := 0.15
 
 var _fade_layer: CanvasLayer
 var _fade_rect: ColorRect
 var _developer_panel: CanvasLayer
-var _card_inspector: CanvasLayer
+var _card_viewer: CanvasLayer
 var _is_transitioning := false
 var selected_pack_id: String = ""
 
@@ -24,7 +24,7 @@ var selected_pack_id: String = ""
 func _ready() -> void:
 	_setup_fade_overlay()
 	_setup_developer_panel()
-	_setup_card_inspector()
+	_setup_card_viewer()
 
 
 func _input(event: InputEvent) -> void:
@@ -89,10 +89,10 @@ func change_scene(scene_path: String) -> void:
 	_is_transitioning = false
 
 
-func show_card_inspector(card_data: CardData) -> void:
-	if _card_inspector == null:
+func show_card_viewer(card_data: CardData) -> void:
+	if _card_viewer == null:
 		return
-	_card_inspector.show_card(card_data)
+	_card_viewer.show_card(card_data)
 
 
 func toggle_developer_panel() -> void:
@@ -124,7 +124,7 @@ func _setup_developer_panel() -> void:
 	add_child(_developer_panel)
 
 
-func _setup_card_inspector() -> void:
-	_card_inspector = CARD_INSPECTOR_SCENE.instantiate()
-	_card_inspector.visible = false
-	add_child(_card_inspector)
+func _setup_card_viewer() -> void:
+	_card_viewer = CARD_VIEWER_SCENE.instantiate()
+	_card_viewer.visible = false
+	add_child(_card_viewer)

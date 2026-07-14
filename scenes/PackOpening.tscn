@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://c8packopening01"]
 
 [ext_resource type="Script" path="res://scripts/ui/pack_opening.gd" id="1_pack"]
+[ext_resource type="Script" path="res://scripts/ui/menu_button.gd" id="2_menubtn"]
 
 [node name="PackOpening" type="Control"]
 layout_mode = 3
@@ -39,30 +40,32 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 40
 
 [node name="VBox" type="VBoxContainer" parent="MarginContainer"]
 layout_mode = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 18
 
 [node name="TitleLabel" type="Label" parent="MarginContainer/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 26
 text = "Your Pack"
 horizontal_alignment = 1
 
 [node name="StatusLabel" type="Label" parent="MarginContainer/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_font_sizes/font_size = 15
+theme_override_colors/font_color = Color(0.75, 0.78, 0.85, 1)
 text = "Opening your pack..."
 horizontal_alignment = 1
+autowrap_mode = 2
 
 [node name="PackAnchor" type="CenterContainer" parent="MarginContainer/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 280)
 layout_mode = 2
 size_flags_vertical = 3
 
@@ -71,21 +74,6 @@ unique_name_in_owner = true
 visible = false
 layout_mode = 2
 size_flags_vertical = 3
-
-[node name="CardGridArea" type="Control" parent="MarginContainer/VBox/PlayArea"]
-unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -320.0
-offset_top = -220.0
-offset_right = 320.0
-offset_bottom = 220.0
-grow_horizontal = 2
-grow_vertical = 2
 
 [node name="CardFlyLayer" type="Control" parent="MarginContainer/VBox/PlayArea"]
 unique_name_in_owner = true
@@ -97,17 +85,28 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="SkipButton" type="Button" parent="MarginContainer/VBox"]
+[node name="Footer" type="VBoxContainer" parent="MarginContainer/VBox"]
 unique_name_in_owner = true
 visible = false
-custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
-text = "Skip"
+theme_override_constants/separation = 12
 
-[node name="ContinueButton" type="Button" parent="MarginContainer/VBox"]
+[node name="SkipButton" type="Button" parent="MarginContainer/VBox/Footer"]
 unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 17
+text = "Skip"
+script = ExtResource("2_menubtn")
+
+[node name="ContinueButton" type="Button" parent="MarginContainer/VBox/Footer"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 18
 text = "Continue"
+script = ExtResource("2_menubtn")

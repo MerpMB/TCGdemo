@@ -13,15 +13,19 @@ enum FlowState {
 const CARD_SCENE := preload("res://scenes/Card.tscn")
 const FALLBACK_PACK_SCENE := preload("res://scenes/Pack.tscn")
 
+const BASE_CARD_SIZE := Vector2(140, 200)
 const GRID_COLUMNS := 4
-const CARD_SIZE := Vector2(140, 200)
-const CARD_SPACING := Vector2(16, 16)
+const GRID_SPACING := 12.0
+const INNER_PADDING := 8.0
+## Extra reserved space so the grid never overlaps the header/footer.
+const HEADER_GAP := 20.0
+const FOOTER_GAP := 16.0
 
 
 @onready var _pack_anchor: CenterContainer = %PackAnchor
 @onready var _play_area: Control = %PlayArea
 @onready var _card_fly_layer: Control = %CardFlyLayer
-@onready var _card_grid_area: Control = %CardGridArea
+@onready var _footer: VBoxContainer = %Footer
 @onready var _skip_button: Button = %SkipButton
 @onready var _continue_button: Button = %ContinueButton
 @onready var _status_label: Label = %StatusLabel
@@ -33,6 +37,7 @@ var _pack_cards: Array[CardData] = []
 var _card_scenes: Array[CardScene] = []
 var _revealed_count := 0
 var _cards_added := false
+var _layout_scale := 1.0
 
 
 func _ready() -> void:
@@ -41,6 +46,7 @@ func _ready() -> void:
 	_continue_button.pressed.connect(_on_continue_pressed)
 	_continue_button.hide()
 	_skip_button.hide()
+	resized.connect(_on_viewport_resized)
 	_prepare_and_open()
 
 
@@ -55,9 +61,7 @@ func _prepare_and_open() -> void:
 	_revealed_count = 0
 	_cards_added = false
 	_spawn_pack_visual()
-	_pack_anchor.show()
-	_pack_anchor.custom_minimum_size = Vector2(0, 280)
-	_play_area.hide()
+	_show_pack_stage()
 	_status_label.text = "Opening your pack..."
 	call_deferred("_run_opening_sequence")
 
@@ -104,45 +108,166 @@ func _run_pack_sequence() -> void:
 	_pack_scene.explode()
 	await _pack_scene.explode_finished
 	_clear_pack_visual()
-	_pack_anchor.custom_minimum_size = Vector2.ZERO
+
+
+func _show_pack_stage() -> void:
+	_pack_anchor.show()
+	_pack_anchor.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_play_area.hide()
+	_play_area.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_footer.hide()
+
+
+func _show_card_stage() -> void:
+	_pack_anchor.hide()
+	_pack_anchor.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_play_area.show()
+	_play_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_footer.show()
 
 
 func _launch_cards_into_grid() -> void:
 	_state = FlowState.CARDS_ARRIVING
-	_play_area.show()
-	await get_tree().process_frame
+	_show_card_stage()
+	await _await_layout_ready()
 
-	var burst_origin := _pack_anchor.global_position + _pack_anchor.size * 0.5
-	var slot_positions := _calculate_slot_positions(_pack_cards.size())
+	var burst_origin := _get_pack_burst_origin()
+	var layout := _compute_card_layout(_pack_cards.size())
+	_layout_scale = layout.card_scale
+	var slot_centers: Array[Vector2] = layout.centers
 
 	for index in _pack_cards.size():
 		var card_scene := CARD_SCENE.instantiate() as CardScene
 		card_scene.flipped.connect(_on_card_flipped)
 		_card_fly_layer.add_child(card_scene)
 		card_scene.setup(_pack_cards[index], CardScene.DisplayMode.PACK)
+		_prepare_card_for_layout(card_scene, _layout_scale)
 		card_scene.set_pack_reveal_enabled(false)
 		_card_scenes.append(card_scene)
-		await card_scene.await_arrival(burst_origin, slot_positions[index])
+		var global_center := _card_fly_layer.global_position + slot_centers[index]
+		await card_scene.await_arrival(burst_origin, global_center)
+		_apply_card_slot_position(card_scene, slot_centers[index], _layout_scale)
+
+
+func _get_pack_burst_origin() -> Vector2:
+	if _pack_anchor.visible:
+		return _pack_anchor.global_position + _pack_anchor.size * 0.5
+	return _play_area.get_global_rect().get_center()
+
+
+func _await_layout_ready() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+
+## Playable grid rect = the fly layer (already sized by the container to the
+## space between header and footer) minus safe margins plus extra header/footer
+## breathing room. The grid is centered inside whatever remains.
+func _get_usable_card_area() -> Rect2:
+	var rect := _card_fly_layer.get_rect()
+	rect.position.x += INNER_PADDING
+	rect.position.y += HEADER_GAP
+	rect.size.x -= INNER_PADDING * 2.0
+	rect.size.y -= (HEADER_GAP + FOOTER_GAP)
+	rect.size.x = maxf(rect.size.x, 0.0)
+	rect.size.y = maxf(rect.size.y, 0.0)
+	return rect
+
+
+func _scaled_card_size(card_scale: float) -> Vector2:
+	return BASE_CARD_SIZE * card_scale
+
+
+func _scaled_card_half_size(card_scale: float) -> Vector2:
+	return _scaled_card_size(card_scale) * 0.5
+
+
+func _measure_grid_size(columns: int, rows: int, card_size: Vector2) -> Vector2:
+	return Vector2(
+		columns * card_size.x + (columns - 1) * GRID_SPACING,
+		rows * card_size.y + (rows - 1) * GRID_SPACING,
+	)
+
+
+func _resolve_card_scale(columns: int, rows: int, available: Rect2) -> float:
+	var full_grid_size := _measure_grid_size(columns, rows, BASE_CARD_SIZE)
+	if full_grid_size.x <= available.size.x and full_grid_size.y <= available.size.y:
+		return 1.0
+
+	var scale_x := available.size.x / full_grid_size.x if full_grid_size.x > 0.0 else 1.0
+	var scale_y := available.size.y / full_grid_size.y if full_grid_size.y > 0.0 else 1.0
+	return minf(minf(scale_x, scale_y), 1.0)
+
+
+func _prepare_card_for_layout(card_scene: CardScene, card_scale: float) -> void:
+	card_scene.custom_minimum_size = BASE_CARD_SIZE
+	card_scene.size = BASE_CARD_SIZE
+	card_scene.prepare_layout_scale(card_scale)
+
+
+func _apply_card_slot_position(card_scene: CardScene, center_local: Vector2, card_scale: float) -> void:
+	_prepare_card_for_layout(card_scene, card_scale)
+	card_scene.position = center_local - _scaled_card_half_size(card_scale)
+	card_scene.scale = Vector2.ONE * card_scale
 
 
 func _calculate_slot_positions(count: int) -> Array[Vector2]:
-	var positions: Array[Vector2] = []
-	var area_origin := _card_grid_area.global_position
-	var area_size := _card_grid_area.size
+	var layout := _compute_card_layout(count)
+	_layout_scale = layout.card_scale
+	return layout.centers
+
+
+func _compute_card_layout(count: int) -> Dictionary:
+	var available := _get_usable_card_area()
+	var columns := _resolve_grid_columns(count, available.size.x)
+	var rows := int(ceil(float(count) / float(columns)))
+
+	var card_scale := _resolve_card_scale(columns, rows, available)
+	var card_size := _scaled_card_size(card_scale)
+	var grid_size := _measure_grid_size(columns, rows, card_size)
+
+	var origin := available.position + (available.size - grid_size) * 0.5
+	origin.x = clampf(origin.x, available.position.x, maxf(available.position.x, available.position.x + available.size.x - grid_size.x))
+	origin.y = maxf(origin.y, available.position.y)
+
+	var centers: Array[Vector2] = []
 
 	for index in count:
-		var row := int(index / GRID_COLUMNS)
-		var col := index % GRID_COLUMNS
-		var cards_in_row := mini(GRID_COLUMNS, count - row * GRID_COLUMNS)
-		var row_width := cards_in_row * CARD_SIZE.x + (cards_in_row - 1) * CARD_SPACING.x
-		var x_offset := (area_size.x - row_width) * 0.5
-		var local_center := Vector2(
-			x_offset + col * (CARD_SIZE.x + CARD_SPACING.x) + CARD_SIZE.x * 0.5,
-			row * (CARD_SIZE.y + CARD_SPACING.y) + CARD_SIZE.y * 0.5
+		var row := int(index / columns)
+		var col := index % columns
+		var cards_in_row := mini(columns, count - row * columns)
+		var row_width := cards_in_row * card_size.x + (cards_in_row - 1) * GRID_SPACING
+		var row_offset_x := (grid_size.x - row_width) * 0.5
+		var center := origin + Vector2(
+			row_offset_x + col * (card_size.x + GRID_SPACING) + card_size.x * 0.5,
+			row * (card_size.y + GRID_SPACING) + card_size.y * 0.5,
 		)
-		positions.append(area_origin + local_center)
+		centers.append(center)
 
-	return positions
+	return {
+		"card_scale": card_scale,
+		"centers": centers,
+	}
+
+
+func _resolve_grid_columns(count: int, available_width: float) -> int:
+	var preferred := GRID_COLUMNS if count > GRID_COLUMNS else count
+	var max_fit := int((available_width + GRID_SPACING) / (BASE_CARD_SIZE.x + GRID_SPACING))
+	return clampi(mini(preferred, max_fit), 1, count)
+
+
+func _reposition_cards_in_grid() -> void:
+	if _card_scenes.is_empty() or not _play_area.visible:
+		return
+
+	var centers := _calculate_slot_positions(_card_scenes.size())
+	for index in _card_scenes.size():
+		_apply_card_slot_position(_card_scenes[index], centers[index], _layout_scale)
+
+
+func _on_viewport_resized() -> void:
+	if _state == FlowState.CARDS_ARRIVING or _state == FlowState.REVEALING or _state == FlowState.DONE:
+		_reposition_cards_in_grid()
 
 
 func _enable_card_reveals() -> void:
@@ -150,6 +275,8 @@ func _enable_card_reveals() -> void:
 	_skip_button.disabled = false
 	for card_scene in _card_scenes:
 		card_scene.set_pack_reveal_enabled(true)
+	await _await_layout_ready()
+	_reposition_cards_in_grid()
 
 
 func _on_card_flipped(_card_scene: CardScene) -> void:
@@ -187,6 +314,8 @@ func _finish_pack() -> void:
 
 	_status_label.text = "%d cards added to your collection!" % _pack_cards.size()
 	_continue_button.show()
+	await _await_layout_ready()
+	_reposition_cards_in_grid()
 
 
 func _on_skip_pressed() -> void:

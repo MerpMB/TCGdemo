@@ -87,6 +87,15 @@ static func get_frame_style(rarity: CardData.Rarity) -> StyleBoxFlat:
 	return style
 
 
+## Frame drawn as a transparent overlay above full-bleed artwork.
+## Same rarity border/shadow as get_frame_style but with no fill, so the
+## artwork underneath is never covered or shrunk.
+static func get_frame_overlay_style(rarity: CardData.Rarity) -> StyleBoxFlat:
+	var style := get_frame_style(rarity)
+	style.bg_color = Color(0, 0, 0, 0)
+	return style
+
+
 static func get_card_back_style(back_type: CardBackType = CardBackType.DEFAULT) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.corner_radius_top_left = 10

@@ -1,9 +1,10 @@
-﻿[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="CardData" load_steps=3 format=3]
 
-[ext_resource type="Script" path="res://scripts/data/card_data.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data/card_data.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://dc3rlg6fla2vn" path="res://assets/cards/common/04-rookie-earth-mage.png" id="2_art"]
 
 [resource]
-script = ExtResource("1")
+script = ExtResource("1_script")
 card_id = "common_004"
 display_name = "Common Card 4"
 card_set = "Core Set"
@@ -12,6 +13,7 @@ rarity = 0
 variant = 0
 frame = "common"
 card_back = "default"
+artwork = ExtResource("2_art")
 artist = ""
 flavor_text = ""
 tags = PackedStringArray("core")

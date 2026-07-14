@@ -65,7 +65,7 @@ TCGdemo/
 │   └── packs/                 # Future .tres pack configs
 ├── scenes/
 │   ├── Card.tscn
-│   ├── CardInspector.tscn
+│   ├── CardViewer.tscn
 │   ├── Collection.tscn
 │   ├── DeckBuilder.tscn
 │   ├── DeveloperPanel.tscn
@@ -79,8 +79,8 @@ TCGdemo/
 │   ├── systems/
 │   │   └── pack_generator.gd
 │   └── ui/
-│       ├── card_inspector.gd
 │       ├── card_scene.gd
+│       ├── card_viewer.gd
 │       ├── card_visual_library.gd
 │       ├── collection_view.gd
 │       ├── deck_builder.gd

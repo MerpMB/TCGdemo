@@ -1,9 +1,9 @@
-﻿[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://scripts/data/card_data.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data/card_data.gd" id="1_script"]
 
 [resource]
-script = ExtResource("1")
+script = ExtResource("1_script")
 card_id = "event_storm_001"
 display_name = "Storm Herald"
 card_set = "Event Set"
@@ -12,6 +12,7 @@ rarity = 2
 variant = 0
 frame = "epic"
 card_back = "event"
+artwork = null
 artist = ""
 flavor_text = ""
 tags = PackedStringArray("event", "limited")

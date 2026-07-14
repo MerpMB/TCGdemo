@@ -19,23 +19,22 @@ enum DisplayMode {
 const HOVER_SCALE := 1.06
 const CLICK_SCALE := 0.94
 const ANIM_DURATION := 0.12
+## Neutral opaque backing behind full-bleed artwork (prevents alpha wash-out).
+const CARD_BODY_COLOR := Color(0.06, 0.07, 0.1, 1.0)
 
 
 @onready var _flip_pivot: Control = %FlipPivot
 @onready var _back_face: Control = %BackFace
 @onready var _front_face: Control = %FrontFace
 @onready var _frame_panel: Control = %FramePanel
-@onready var _art_area: ColorRect = %ArtArea
+@onready var _card_body: ColorRect = %CardBody
+@onready var _art_texture: TextureRect = %ArtTexture
 @onready var _rarity_glow: ColorRect = %RarityGlow
-@onready var _rarity_label: Label = %RarityLabel
-@onready var _variant_label: Label = %VariantLabel
-@onready var _card_id_label: Label = %CardIdLabel
-@onready var _card_name_label: Label = %CardNameLabel
 @onready var _negative_overlay: ColorRect = %NegativeOverlay
 @onready var _foil_shine: ColorRect = %FoilShine
-@onready var _alt_art_icon: Label = %AltArtIcon
+@onready var _alt_art_icon: ColorRect = %AltArtIcon
 @onready var _diamond_glow: ColorRect = %DiamondGlow
-@onready var _diamond_icon: Label = %DiamondIcon
+@onready var _diamond_icon: ColorRect = %DiamondIcon
 @onready var _legendary_spark: ColorRect = %LegendarySpark
 @onready var _flip_button: Button = %FlipButton
 @onready var _audio_flip: AudioStreamPlayer = %AudioFlip
@@ -59,8 +58,9 @@ func _ready() -> void:
 	_base_scale = scale
 	_pivot_rest_position = _flip_pivot.position
 	_flip_button.pressed.connect(_on_flip_pressed)
-	mouse_entered.connect(_on_mouse_entered)
-	mouse_exited.connect(_on_mouse_exited)
+	if not DisplayServer.is_touchscreen_available():
+		mouse_entered.connect(_on_mouse_entered)
+		mouse_exited.connect(_on_mouse_exited)
 	gui_input.connect(_on_gui_input)
 	_reset_variant_overlays()
 	_show_face_down()
@@ -91,8 +91,17 @@ func get_card_data() -> CardData:
 	return _card_data
 
 
+func prepare_layout_scale(layout_scale: float) -> void:
+	_base_scale = Vector2.ONE * layout_scale
+
+
+func get_layout_half_size() -> Vector2:
+	return size * _base_scale * 0.5
+
+
 func play_arrival(from_global: Vector2, to_global: Vector2) -> void:
-	global_position = from_global - size * 0.5
+	var half_size := get_layout_half_size()
+	global_position = from_global - half_size
 	scale = Vector2.ZERO
 	rotation = randf_range(-0.35, 0.35)
 	modulate.a = 0.0
@@ -103,7 +112,7 @@ func play_arrival(from_global: Vector2, to_global: Vector2) -> void:
 	_motion_tween.set_parallel(true)
 	_motion_tween.set_trans(Tween.TRANS_BACK)
 	_motion_tween.set_ease(Tween.EASE_OUT)
-	_motion_tween.tween_property(self, "global_position", to_global - size * 0.5, 0.42)
+	_motion_tween.tween_property(self, "global_position", to_global - half_size, 0.42)
 	_motion_tween.tween_property(self, "scale", _base_scale, 0.42)
 	_motion_tween.tween_property(self, "rotation", 0.0, 0.42)
 	_motion_tween.tween_property(self, "modulate:a", 1.0, 0.2)
@@ -161,7 +170,7 @@ func _apply_card_data() -> void:
 
 	_frame_panel.add_theme_stylebox_override(
 		"panel",
-		CardVisualLibrary.get_frame_style(_card_data.rarity)
+		CardVisualLibrary.get_frame_overlay_style(_card_data.rarity)
 	)
 	_back_face.add_theme_stylebox_override(
 		"panel",
@@ -169,14 +178,24 @@ func _apply_card_data() -> void:
 	)
 
 	var rarity_color := CardData.get_rarity_color(_card_data.rarity)
-	_art_area.color = rarity_color
+	_apply_artwork()
 	_rarity_glow.color = Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.0)
-	_rarity_label.text = CardData.get_rarity_label(_card_data.rarity)
-	_variant_label.text = CardData.get_variant_label(_card_data.variant)
-	_card_id_label.text = _card_data.card_id
-	_card_name_label.text = _card_data.display_name
 
 	_configure_variant_overlay()
+
+
+## Full-bleed artwork is the bottom layer of the front face. The opaque CardBody
+## sits behind the front so any alpha in the artwork blends over a neutral dark
+## base (never a bright rarity color), preventing washed-out artwork. When a
+## card has no artwork, the body falls back to the rarity color.
+func _apply_artwork() -> void:
+	var has_art := _card_data.artwork != null
+	_art_texture.texture = _card_data.artwork
+	_art_texture.visible = has_art
+	if has_art:
+		_card_body.color = CARD_BODY_COLOR
+	else:
+		_card_body.color = CardData.get_rarity_color(_card_data.rarity)
 
 
 func _configure_variant_overlay() -> void:
@@ -328,9 +347,17 @@ func _on_gui_input(event: InputEvent) -> void:
 	if not _is_interactive:
 		return
 
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+	if _is_press_event(event):
 		_play_click_animation()
 		card_pressed.emit(self)
+
+
+func _is_press_event(event: InputEvent) -> bool:
+	if event is InputEventScreenTouch:
+		return event.pressed
+	if event is InputEventMouseButton:
+		return event.pressed and event.button_index == MOUSE_BUTTON_LEFT
+	return false
 
 
 func _play_click_animation() -> void:

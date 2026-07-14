@@ -20,11 +20,23 @@ func get_card(card_id: String) -> CardData:
 
 
 func get_cards_by_rarity(rarity: CardData.Rarity) -> Array[CardData]:
-	return _cards_by_rarity.get(rarity, []).duplicate()
+	var result: Array[CardData] = []
+
+	if _cards_by_rarity.has(rarity):
+		for card: CardData in _cards_by_rarity[rarity]:
+			result.append(card)
+
+	return result
 
 
-func get_cards_by_set(set_name: String) -> Array[CardData]:
-	return _cards_by_set.get(set_name, []).duplicate()
+func get_cards_by_set(card_set_name: String) -> Array[CardData]:
+	var result: Array[CardData] = []
+
+	if _cards_by_set.has(card_set_name):
+		for card: CardData in _cards_by_set[card_set_name]:
+			result.append(card)
+
+	return result
 
 
 func get_cards_with_tag(tag: String) -> Array[CardData]:
