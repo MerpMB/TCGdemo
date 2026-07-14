@@ -1,7 +1,8 @@
 extends Control
-## Gallery of every card the player owns — a scrollable binder that puts the
-## artwork first. Thumbnails render art + rarity frame + variant only.
-## Tapping a card opens the shared CardViewer.
+## Gallery of unique collectibles the player owns.
+## Exact duplicates (same card_id + variant) stack into one entry with an owned
+## count badge. Different variants remain separate. Storage in CollectionManager
+## is unchanged — stacking is view-only.
 
 
 const CARD_SCENE := preload("res://scenes/Card.tscn")
@@ -26,20 +27,51 @@ func _ready() -> void:
 func _refresh_collection() -> void:
 	_clear_grid()
 
-	var cards := _apply_view_filters(CollectionManager.get_collection())
-	_empty_label.visible = cards.is_empty()
-	_count_label.text = "%d cards" % cards.size()
+	var entries := _stack_unique_collectibles(
+		_apply_view_filters(CollectionManager.get_collection())
+	)
+	_empty_label.visible = entries.is_empty()
+	_count_label.text = "%d cards" % entries.size()
 
-	for card_data in cards:
+	for entry in entries:
 		var card_scene := CARD_SCENE.instantiate() as CardScene
 		card_scene.card_pressed.connect(_on_card_pressed)
 		_grid.add_child(card_scene)
-		card_scene.setup(card_data, CardScene.DisplayMode.GALLERY)
+		card_scene.setup(entry.card, CardScene.DisplayMode.GALLERY)
+		card_scene.set_owned_count(entry.count)
 		card_scene.scale = Vector2.ONE
 
 
 func _on_card_pressed(card_scene: CardScene) -> void:
+	# CardViewer already exists — open the selected collectible.
 	GameManager.show_card_viewer(card_scene.get_card_data())
+
+
+## Stack exact duplicates only. Key = card_id + variant so Foil / Diamond / etc.
+## remain separate gallery entries. Returns [{card: CardData, count: int}, ...]
+## in first-seen order.
+func _stack_unique_collectibles(cards: Array[CardData]) -> Array[Dictionary]:
+	var order: Array[String] = []
+	var stacks: Dictionary = {}
+
+	for card in cards:
+		if card == null:
+			continue
+		var key := _collectible_key(card)
+		if stacks.has(key):
+			stacks[key].count += 1
+		else:
+			stacks[key] = {"card": card, "count": 1}
+			order.append(key)
+
+	var entries: Array[Dictionary] = []
+	for key in order:
+		entries.append(stacks[key])
+	return entries
+
+
+func _collectible_key(card: CardData) -> String:
+	return "%s:%d" % [card.card_id, int(card.variant)]
 
 
 ## Future hook (Phase 6+): search query and rarity/variant/favorite filters

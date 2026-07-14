@@ -43,6 +43,7 @@ const CARD_BODY_COLOR := Color(0.06, 0.07, 0.1, 1.0)
 @onready var _diamond_glow: ColorRect = %DiamondGlow
 @onready var _diamond_icon: ColorRect = %DiamondIcon
 @onready var _legendary_spark: ColorRect = %LegendarySpark
+@onready var _owned_count_badge: Label = %OwnedCountBadge
 @onready var _flip_button: Button = %FlipButton
 @onready var _audio_flip: AudioStreamPlayer = %AudioFlip
 @onready var _audio_rare_reveal: AudioStreamPlayer = %AudioRareReveal
@@ -96,6 +97,16 @@ func is_revealed() -> bool:
 
 func get_card_data() -> CardData:
 	return _card_data
+
+
+## Gallery-only owned stack count. Hidden outside GALLERY mode and when count < 1.
+## Does not affect layout — the badge is an overlay in the bottom-right corner.
+func set_owned_count(count: int) -> void:
+	if _display_mode != DisplayMode.GALLERY or count < 1:
+		_owned_count_badge.hide()
+		return
+	_owned_count_badge.text = "×%d" % count
+	_owned_count_badge.show()
 
 
 func prepare_layout_scale(layout_scale: float) -> void:
@@ -157,6 +168,7 @@ func _configure_mode() -> void:
 		DisplayMode.PACK:
 			_flip_button.show()
 			mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_owned_count_badge.hide()
 			_show_face_down()
 		DisplayMode.GALLERY:
 			_flip_button.hide()
@@ -166,6 +178,7 @@ func _configure_mode() -> void:
 		DisplayMode.PREVIEW:
 			_flip_button.hide()
 			mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_owned_count_badge.hide()
 			_show_face_up()
 			scale = _base_scale * 1.15
 			_play_variant_idle()
