@@ -129,6 +129,49 @@ cd TCGdemo
 3. Use the main menu to open packs, browse your collection, and build a deck.
 4. Press **F1** at any time to open the Developer Panel.
 
+## Content Pipeline (No Code Required)
+
+`CardScene` is a full-art renderer: every per-card visual (artwork, frame,
+variant effect, card back) resolves from the `CardData` resource. `CardDatabase`
+recursively auto-scans `res://resources/cards/` on startup, so **adding a card
+never requires editing scripts.**
+
+### Add a new card
+
+1. **Drop the artwork** PNG anywhere under `res://assets/` (e.g. `assets/cards/rare/`).
+   Godot imports it automatically on focus.
+2. **Create a `CardData` resource** (`.tres`) under `res://resources/cards/`:
+   - Set `card_id` (unique), `display_name`, `rarity`, and `variant`.
+   - Assign the imported texture to the `artwork` field.
+   - Optionally set `frame` (a frame key) and `card_back`.
+3. **Launch the game.** The card is registered automatically and renders full-bleed.
+
+Rendering layer order (bottom → top): **artwork → frame → variant effect → FX**.
+The artwork always fills the card and sits underneath the frame border.
+
+### Frame art (optional)
+
+The frame is procedural by default. To use image frames, drop PNGs named by
+frame key into `res://assets/frames/`:
+
+```
+assets/frames/common.png
+assets/frames/rare.png
+assets/frames/epic.png
+assets/frames/legendary.png
+```
+
+The renderer loads `assets/frames/<key>.png` automatically (key comes from
+`CardData.frame`, falling back to the rarity name). If a PNG is missing, the
+procedural rarity border is used instead — the card always renders.
+
+### Remaining manual steps
+
+- Artwork/frame PNGs must be imported by the Godot editor once (automatic on
+  focus, or run a headless `--import`). `.import` metadata is git-ignored by design.
+- To make a card obtainable in-game, include it in a pack config or grant it via
+  the Developer Panel — the card exists in the database either way.
+
 ## Roadmap
 
 | Phase | Status | Description |

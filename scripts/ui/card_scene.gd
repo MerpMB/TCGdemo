@@ -1,7 +1,13 @@
 class_name CardScene
 extends Control
-## Visual representation of a single card.
-## Owns frame/back selection, variant overlays, and reveal animations.
+## Visual representation of a single card, used everywhere (pack, gallery, viewer).
+##
+## Responsibilities are grouped into clearly separated sections below:
+##   - Rendering: artwork, frame, and variant overlays (all driven by CardData)
+##   - Face state: front/back visibility
+##   - Reveal animation: the pack flip, arrival, and rarity finish
+##   - Input & interaction: taps, hover, click feedback
+## All per-card visuals resolve from CardData; nothing is hardcoded per card.
 
 
 signal flipped(card_scene: CardScene)
@@ -26,6 +32,7 @@ const CARD_BODY_COLOR := Color(0.06, 0.07, 0.1, 1.0)
 @onready var _flip_pivot: Control = %FlipPivot
 @onready var _back_face: Control = %BackFace
 @onready var _front_face: Control = %FrontFace
+@onready var _frame_texture: TextureRect = %FrameTexture
 @onready var _frame_panel: Control = %FramePanel
 @onready var _card_body: ColorRect = %CardBody
 @onready var _art_texture: TextureRect = %ArtTexture
@@ -164,14 +171,15 @@ func _configure_mode() -> void:
 			_play_variant_idle()
 
 
+# ---------------------------------------------------------------------------
+# Rendering — artwork, frame, and variant overlays (all resolved from CardData)
+# ---------------------------------------------------------------------------
+
 func _apply_card_data() -> void:
 	if _card_data == null:
 		return
 
-	_frame_panel.add_theme_stylebox_override(
-		"panel",
-		CardVisualLibrary.get_frame_overlay_style(_card_data.rarity)
-	)
+	_apply_frame()
 	_back_face.add_theme_stylebox_override(
 		"panel",
 		CardVisualLibrary.get_card_back_style(_back_type)
@@ -182,6 +190,25 @@ func _apply_card_data() -> void:
 	_rarity_glow.color = Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.0)
 
 	_configure_variant_overlay()
+
+
+## Frame overlay is data-driven via CardData.get_frame_key(). If production frame
+## art exists (assets/frames/<key>.png) it is used; otherwise we fall back to the
+## procedural rarity border so the card always renders. No hardcoded textures.
+func _apply_frame() -> void:
+	var frame := CardVisualLibrary.get_frame_texture(_card_data.get_frame_key())
+	if frame != null:
+		_frame_texture.texture = frame
+		_frame_texture.visible = true
+		_frame_panel.visible = false
+	else:
+		_frame_texture.texture = null
+		_frame_texture.visible = false
+		_frame_panel.visible = true
+		_frame_panel.add_theme_stylebox_override(
+			"panel",
+			CardVisualLibrary.get_frame_overlay_style(_card_data.rarity)
+		)
 
 
 ## Full-bleed artwork is the bottom layer of the front face. The opaque CardBody
@@ -223,6 +250,10 @@ func _reset_variant_overlays() -> void:
 	_foil_shine.position.x = -size.x
 
 
+# ---------------------------------------------------------------------------
+# Face state
+# ---------------------------------------------------------------------------
+
 func _show_face_down() -> void:
 	_back_face.show()
 	_front_face.hide()
@@ -236,12 +267,21 @@ func _show_face_up() -> void:
 	_flip_button.disabled = true
 
 
+# ---------------------------------------------------------------------------
+# Reveal animation
+# ---------------------------------------------------------------------------
+
 func _on_flip_pressed() -> void:
 	if not _pack_reveal_enabled or _is_revealed or _is_revealing:
 		return
 	reveal_interactive()
 
 
+## Reveal flip. The card moves as one unit: the vertical "lift" is applied to
+## the card root (self) so its clip rect travels with the artwork/frame and
+## nothing is clipped at the top. Only the flip's horizontal squash uses the
+## FlipPivot, which carries both faces together (art and frame never desync).
+## The lift always settles back to the exact rest position.
 func _play_pack_reveal(instant: bool) -> void:
 	_is_revealing = true
 	_flip_button.disabled = true
@@ -249,12 +289,14 @@ func _play_pack_reveal(instant: bool) -> void:
 	var rarity := _card_data.rarity
 	var duration := 0.12 if instant else CardVisualLibrary.get_reveal_duration(rarity)
 	var lift := 0.0 if instant else CardVisualLibrary.get_reveal_lift(rarity)
+	var rest_y := position.y
 
 	_kill_motion_tween()
 	_flip_pivot.position = _pivot_rest_position
+	_flip_pivot.pivot_offset = _flip_pivot.size * 0.5
 
 	_motion_tween = create_tween()
-	_motion_tween.tween_property(_flip_pivot, "position:y", _pivot_rest_position.y + lift, duration * 0.35)
+	_motion_tween.tween_property(self, "position:y", rest_y + lift, duration * 0.35)
 
 	if not instant and rarity >= CardData.Rarity.RARE:
 		_motion_tween.parallel().tween_method(_set_rarity_glow, 0.0, CardVisualLibrary.get_reveal_glow_alpha(rarity), duration)
@@ -267,7 +309,10 @@ func _play_pack_reveal(instant: bool) -> void:
 
 	_motion_tween = create_tween()
 	_motion_tween.tween_property(_flip_pivot, "scale:x", 1.0, duration * 0.45)
+	_motion_tween.parallel().tween_property(self, "position:y", rest_y, duration * 0.45)
 	await _motion_tween.finished
+
+	position.y = rest_y
 
 	if not instant:
 		await _play_rarity_finish(rarity)
@@ -330,6 +375,10 @@ func _set_rarity_glow(alpha: float) -> void:
 	var color := CardData.get_rarity_color(_card_data.rarity)
 	_rarity_glow.color = Color(color.r, color.g, color.b, alpha)
 
+
+# ---------------------------------------------------------------------------
+# Input & interaction
+# ---------------------------------------------------------------------------
 
 func _on_mouse_entered() -> void:
 	if not _is_interactive:

@@ -19,6 +19,16 @@ const FRAME_KEYS := {
 	CardData.Rarity.LEGENDARY: "legendary",
 }
 
+## Production frame art lives here as "<frame_key>.png" (e.g. common.png).
+## Artists only drop PNGs in this folder — no code changes are needed. When a
+## frame texture is absent, the renderer falls back to the procedural StyleBox
+## border below, so the game always renders correctly.
+const FRAMES_ROOT := "res://assets/frames"
+
+## Cache of resolved frame textures (including null misses) so repeated lookups
+## never hit disk again — important for grid/gallery rendering on mobile.
+static var _frame_texture_cache: Dictionary = {}
+
 const REVEAL_DURATIONS := {
 	CardData.Rarity.COMMON: 0.28,
 	CardData.Rarity.RARE: 0.34,
@@ -94,6 +104,21 @@ static func get_frame_overlay_style(rarity: CardData.Rarity) -> StyleBoxFlat:
 	var style := get_frame_style(rarity)
 	style.bg_color = Color(0, 0, 0, 0)
 	return style
+
+
+## Resolves the image frame for a frame key (rarity name or CardData.frame).
+## Returns null when no PNG exists, signalling the caller to use the procedural
+## fallback. Results are cached (misses included).
+static func get_frame_texture(frame_key: String) -> Texture2D:
+	if _frame_texture_cache.has(frame_key):
+		return _frame_texture_cache[frame_key]
+
+	var path := "%s/%s.png" % [FRAMES_ROOT, frame_key]
+	var texture: Texture2D = null
+	if ResourceLoader.exists(path):
+		texture = load(path) as Texture2D
+	_frame_texture_cache[frame_key] = texture
+	return texture
 
 
 static func get_card_back_style(back_type: CardBackType = CardBackType.DEFAULT) -> StyleBoxFlat:
