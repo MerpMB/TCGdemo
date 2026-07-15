@@ -35,7 +35,7 @@ func _run() -> void:
 		quit(1)
 		return
 
-	if not _validate_shared_pulse_timing():
+	if not _validate_packet_materials():
 		quit(1)
 		return
 
@@ -144,24 +144,30 @@ func _validate_layer_blueprint() -> bool:
 	return true
 
 
-func _validate_shared_pulse_timing() -> bool:
+func _validate_packet_materials() -> bool:
 	var stream_mat := CardVisualLibrary.create_synth_data_stream_material()
-	var pulse_mat := CardVisualLibrary.create_synth_energy_pulse_material()
-	if stream_mat == null or pulse_mat == null:
-		push_error("Synth shader materials failed to build.")
+	var trail_mat := CardVisualLibrary.create_synth_energy_pulse_material()
+	if stream_mat == null or trail_mat == null:
+		push_error("Synth packet materials failed to build.")
 		return false
 
-	var stream_interval: Variant = stream_mat.get_shader_parameter("pulse_interval")
-	var pulse_interval: Variant = pulse_mat.get_shader_parameter("pulse_interval")
-	if stream_interval != pulse_interval:
-		push_error(
-			"Data stream and energy pulse must share pulse_interval (got %s vs %s)."
-			% [str(stream_interval), str(pulse_interval)]
-		)
+	# Primary stream must expose packet uniforms (not a heartbeat interval).
+	if stream_mat.get_shader_parameter("packet_speed") == null:
+		push_error("Data stream missing packet_speed.")
+		return false
+	if stream_mat.get_shader_parameter("trail_length") == null:
+		push_error("Data stream missing trail_length.")
 		return false
 
-	if not is_equal_approx(float(stream_interval), CardVisualLibrary.SYNTH_PULSE_INTERVAL):
-		push_error("Synth pulse_interval does not match library constant.")
+	# Secondary layer must also be packet traffic, not a shared pulse clock.
+	if trail_mat.get_shader_parameter("packet_speed") == null:
+		push_error("Secondary trail layer missing packet_speed.")
+		return false
+
+	var stream_speed := float(stream_mat.get_shader_parameter("packet_speed"))
+	var trail_speed := float(trail_mat.get_shader_parameter("packet_speed"))
+	if is_equal_approx(stream_speed, trail_speed):
+		push_error("Primary and secondary packet speeds must differ (independent traffic).")
 		return false
 
 	return true

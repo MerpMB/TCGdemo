@@ -129,36 +129,43 @@ const FOIL_SPARKLE_BRIGHTNESS := 0.44
 # Occupies ~20–40% of surface; artwork-first. No rainbow / metal / glitter.
 # ---------------------------------------------------------------------------
 
-## Shared motion clock — all Synth shaders derive timing from this.
+## Shared motion clock — multiplies continuous signal travel only.
 const SYNTH_MASTER_TIME_SCALE := 1.0
 
 ## 1. Micro Circuit Texture — faint PCB etch (MUL).
-const SYNTH_MICRO_CIRCUIT_STRENGTH := 0.032
+const SYNTH_MICRO_CIRCUIT_STRENGTH := 0.028
 const SYNTH_MICRO_CIRCUIT_FREQUENCY := 2.4
 
-## 2. Circuit Trace Network — thin Tron light-roads (ADD).
-const SYNTH_TRACE_STRENGTH := 0.38
-const SYNTH_TRACE_TIME_SCALE := 0.04
-const SYNTH_TRACE_EDGE_GLOW := 0.04
+## 2. Circuit Trace Network — static idle neural PCB (ADD). Keep faint.
+const SYNTH_TRACE_STRENGTH := 0.24
+const SYNTH_TRACE_EDGE_GLOW := 0.015
 
-## 3. Flowing Data Stream — racing light packets along roads (ADD).
-const SYNTH_STREAM_STRENGTH := 0.55
-const SYNTH_STREAM_TIME_SCALE := 0.16
-const SYNTH_PACKET_SPEED := 1.35
-const SYNTH_PACKET_SIZE := 0.045
+## 3. Primary signals — few large iridescent waves (ADD).
+const SYNTH_STREAM_STRENGTH := 0.62
+const SYNTH_STREAM_TIME_SCALE := 0.48
+const SYNTH_PACKET_SPEED := 0.78
+const SYNTH_PACKET_SIZE := 0.055
+const SYNTH_BODY_LENGTH := 0.18
+const SYNTH_TRAIL_LENGTH := 0.28
+const SYNTH_SYNAPSE_STRENGTH := 0.55
+const SYNTH_RAINBOW_STRENGTH := 0.78
 
-## 4. Energy Pulse — slow heartbeat through network (ADD).
-const SYNTH_PULSE_STRENGTH := 0.42
-const SYNTH_PULSE_TIME_SCALE := 0.05
-const SYNTH_PULSE_INTERVAL := 5.5
-const SYNTH_PULSE_WIDTH := 0.16
+## 4. Deep thoughts — rare secondary waves (ADD).
+const SYNTH_TRAIL_STRENGTH := 0.28
+const SYNTH_TRAIL_TIME_SCALE := 0.26
+const SYNTH_TRAIL_PACKET_SPEED := 0.48
+const SYNTH_TRAIL_PACKET_SIZE := 0.06
+const SYNTH_TRAIL_BODY_LENGTH := 0.22
+const SYNTH_TRAIL_LENGTH_SECONDARY := 0.34
+const SYNTH_TRAIL_SYNAPSE_STRENGTH := 0.40
+const SYNTH_TRAIL_RAINBOW_STRENGTH := 0.70
 
-## 5. Tiny Data Nodes — sparse junction lights (ADD + pulse).
-const SYNTH_NODE_OPACITY := 0.18
-const SYNTH_NODE_DENSITY := 0.988
-const SYNTH_NODE_PULSE_SPEED := 0.18
+## 5. Tiny Data Nodes — sparse standby junctions (ADD). Keep subtle.
+const SYNTH_NODE_OPACITY := 0.08
+const SYNTH_NODE_DENSITY := 0.992
+const SYNTH_NODE_PULSE_SPEED := 0.08
 const SYNTH_NODE_SIZE := 0.92
-const SYNTH_NODE_BRIGHTNESS := 0.55
+const SYNTH_NODE_BRIGHTNESS := 0.35
 
 ## Per-variant layer blueprints — renderer consumes materialized VariantLayer instances only.
 ## Layer type keys: texture, shader, color, particles
@@ -639,9 +646,6 @@ static func create_synth_circuit_traces_material() -> ShaderMaterial:
 	var material := create_variant_material("synth_circuit_traces")
 	if material:
 		material.set_shader_parameter("trace_strength", SYNTH_TRACE_STRENGTH)
-		material.set_shader_parameter(
-			"time_scale", SYNTH_TRACE_TIME_SCALE * SYNTH_MASTER_TIME_SCALE
-		)
 		material.set_shader_parameter("edge_glow", SYNTH_TRACE_EDGE_GLOW)
 	return material
 
@@ -655,20 +659,27 @@ static func create_synth_data_stream_material() -> ShaderMaterial:
 		)
 		material.set_shader_parameter("packet_speed", SYNTH_PACKET_SPEED)
 		material.set_shader_parameter("packet_size", SYNTH_PACKET_SIZE)
-		material.set_shader_parameter("pulse_interval", SYNTH_PULSE_INTERVAL)
-		material.set_shader_parameter("pulse_width", SYNTH_PULSE_WIDTH)
+		material.set_shader_parameter("body_length", SYNTH_BODY_LENGTH)
+		material.set_shader_parameter("trail_length", SYNTH_TRAIL_LENGTH)
+		material.set_shader_parameter("synapse_strength", SYNTH_SYNAPSE_STRENGTH)
+		material.set_shader_parameter("rainbow_strength", SYNTH_RAINBOW_STRENGTH)
 	return material
 
 
 static func create_synth_energy_pulse_material() -> ShaderMaterial:
+	## Deep-thought / synaptic layer (blueprint id remains "energy_pulse").
 	var material := create_variant_material("synth_energy_pulse")
 	if material:
-		material.set_shader_parameter("pulse_strength", SYNTH_PULSE_STRENGTH)
+		material.set_shader_parameter("pulse_strength", SYNTH_TRAIL_STRENGTH)
 		material.set_shader_parameter(
-			"time_scale", SYNTH_PULSE_TIME_SCALE * SYNTH_MASTER_TIME_SCALE
+			"time_scale", SYNTH_TRAIL_TIME_SCALE * SYNTH_MASTER_TIME_SCALE
 		)
-		material.set_shader_parameter("pulse_interval", SYNTH_PULSE_INTERVAL)
-		material.set_shader_parameter("pulse_width", SYNTH_PULSE_WIDTH)
+		material.set_shader_parameter("packet_speed", SYNTH_TRAIL_PACKET_SPEED)
+		material.set_shader_parameter("packet_size", SYNTH_TRAIL_PACKET_SIZE)
+		material.set_shader_parameter("body_length", SYNTH_TRAIL_BODY_LENGTH)
+		material.set_shader_parameter("trail_length", SYNTH_TRAIL_LENGTH_SECONDARY)
+		material.set_shader_parameter("synapse_strength", SYNTH_TRAIL_SYNAPSE_STRENGTH)
+		material.set_shader_parameter("rainbow_strength", SYNTH_TRAIL_RAINBOW_STRENGTH)
 	return material
 
 

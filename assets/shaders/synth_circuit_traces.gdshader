@@ -3,26 +3,24 @@ render_mode blend_add, unshaded;
 
 #include "synth_circuit_field.gdshaderinc"
 
-// Layer 2 — idle glowing light-roads (Tron city grid from above).
+// Layer 2 — idle neural PCB.
+// Static faint illumination. The board does not breathe or pulse.
 
-uniform float trace_strength : hint_range(0.0, 1.0) = 0.38;
-uniform float time_scale : hint_range(0.0, 0.2) = 0.04;
-uniform float edge_glow : hint_range(0.0, 0.5) = 0.04;
+uniform float trace_strength : hint_range(0.0, 1.0) = 0.24;
+uniform float edge_glow : hint_range(0.0, 0.5) = 0.015;
 
 void fragment() {
 	vec2 uv = UV;
-	float t = TIME * time_scale;
-
 	float traces = synth_trace_field(uv);
-	// Very slow idle breathe — powered roads, not flashing.
-	float breathe = 0.90 + 0.10 * sin(t * 1.4 + synth_path_coord(uv) * 3.0);
-	traces *= breathe;
+	float junctions = synth_junction_mask(uv);
 
-	// Subtle corner accent only — not a full neon picture frame.
+	// Idle synapses stay barely lit — living standby, not animation.
+	float idle = traces * 0.92 + junctions * 0.18;
+
 	float edge = max(max(1.0 - uv.x, uv.x), max(1.0 - uv.y, uv.y));
-	edge = smoothstep(0.88, 1.0, edge) * edge_glow * synth_region_mask(uv);
+	edge = smoothstep(0.92, 1.0, edge) * edge_glow * synth_region_mask(uv);
 
-	vec3 col = synth_palette(0.2 + traces * 0.35);
-	float alpha = clamp(traces * trace_strength + edge, 0.0, 0.34);
-	COLOR = vec4(col * alpha * 1.2, alpha);
+	vec3 col = synth_palette(0.12 + idle * 0.25);
+	float alpha = clamp(idle * trace_strength + edge, 0.0, 0.26);
+	COLOR = vec4(col * alpha * 1.1, alpha);
 }
