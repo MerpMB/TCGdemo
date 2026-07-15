@@ -1,6 +1,7 @@
 class_name PackGenerator
 extends RefCounted
 ## Generates pack contents from PackConfig and CardDatabase. No UI dependencies.
+## Never inspects card sets/tags — always asks CardDatabase.get_cards_for_pack().
 
 
 static func generate_pack(
@@ -14,10 +15,17 @@ static func generate_pack(
 
 	var pack: Array[CardData] = []
 	var random := _get_rng(rng)
+	var pool: Array[CardData] = database.get_cards_for_pack(pack_config)
+	if pool.is_empty():
+		push_warning(
+			"PackGenerator: empty candidate pool for pack '%s'."
+			% pack_config.pack_id
+		)
+		return pack
 
 	for _slot in pack_config.cards_per_pack:
-		var card := generate_card(
-			database,
+		var card := _generate_card_from_pool(
+			pool,
 			pack_config.rarity_weights,
 			pack_config.variant_weights,
 			random
@@ -30,46 +38,78 @@ static func generate_pack(
 
 static func generate_card(
 	database: Node,
-	rarity_weights: Dictionary,
-	variant_weights: Dictionary,
+	pack_config: PackConfig,
 	rng: RandomNumberGenerator = null
 ) -> CardData:
-	if rarity_weights.is_empty() or variant_weights.is_empty():
+	if pack_config == null:
+		push_warning("PackGenerator: pack_config is null.")
+		return null
+	if pack_config.rarity_weights.is_empty() or pack_config.variant_weights.is_empty():
 		push_warning("PackGenerator: rarity_weights or variant_weights is empty.")
 		return null
 
-	var random := _get_rng(rng)
-	var rarity := _roll_weighted_enum(rarity_weights, random) as CardData.Rarity
-	var variant := _roll_weighted_enum(variant_weights, random) as CardData.Variant
-	var template := _pick_random_card_for_rarity(database, rarity, random)
-
-	if template == null:
-		push_warning("PackGenerator: no card found for rarity %s." % CardData.get_rarity_label(rarity))
+	var pool: Array[CardData] = database.get_cards_for_pack(pack_config)
+	if pool.is_empty():
+		push_warning(
+			"PackGenerator: empty candidate pool for pack '%s'."
+			% pack_config.pack_id
+		)
 		return null
 
-	var pulled_card := template.duplicate_card()
-	pulled_card.variant = variant
-	return pulled_card
+	return _generate_card_from_pool(
+		pool,
+		pack_config.rarity_weights,
+		pack_config.variant_weights,
+		_get_rng(rng)
+	)
 
 
 static func generate_card_of_rarity(
 	database: Node,
+	pack_config: PackConfig,
 	rarity: CardData.Rarity,
-	variant_weights: Dictionary,
 	rng: RandomNumberGenerator = null
 ) -> CardData:
-	if variant_weights.is_empty():
+	if pack_config == null:
+		push_warning("PackGenerator: pack_config is null.")
+		return null
+	if pack_config.variant_weights.is_empty():
 		push_warning("PackGenerator: variant_weights is empty.")
 		return null
 
 	var random := _get_rng(rng)
-	var template := _pick_random_card_for_rarity(database, rarity, random)
-
+	var pool: Array[CardData] = database.get_cards_for_pack(pack_config)
+	var template := _pick_random_card_for_rarity(pool, rarity, random)
 	if template == null:
 		return null
 
 	var pulled_card := template.duplicate_card()
-	pulled_card.variant = _roll_weighted_enum(variant_weights, random) as CardData.Variant
+	pulled_card.variant = _roll_weighted_enum(
+		pack_config.variant_weights,
+		random
+	) as CardData.Variant
+	return pulled_card
+
+
+static func _generate_card_from_pool(
+	pool: Array[CardData],
+	rarity_weights: Dictionary,
+	variant_weights: Dictionary,
+	rng: RandomNumberGenerator
+) -> CardData:
+	var rarity := _roll_weighted_enum(rarity_weights, rng) as CardData.Rarity
+	var variant := _roll_weighted_enum(variant_weights, rng) as CardData.Variant
+	var template := _pick_random_card_for_rarity(pool, rarity, rng)
+
+	if template == null:
+		push_warning(
+			"PackGenerator: no card found for rarity %s in pack pool."
+			% CardData.get_rarity_label(rarity)
+		)
+		return null
+
+	var pulled_card := template.duplicate_card()
+	pulled_card.variant = variant
 	return pulled_card
 
 
@@ -80,16 +120,21 @@ static func _get_rng(rng: RandomNumberGenerator) -> RandomNumberGenerator:
 	return random
 
 
+## Picks from the pack candidate pool only — never queries sets/tags.
 static func _pick_random_card_for_rarity(
-	database: Node,
+	pool: Array[CardData],
 	rarity: CardData.Rarity,
 	rng: RandomNumberGenerator
 ) -> CardData:
-	var pool: Array[CardData] = database.get_cards_by_rarity(rarity)
-	if pool.is_empty():
+	var rarity_pool: Array[CardData] = []
+	for card in pool:
+		if card.rarity == rarity:
+			rarity_pool.append(card)
+
+	if rarity_pool.is_empty():
 		return null
 
-	return pool[rng.randi_range(0, pool.size() - 1)]
+	return rarity_pool[rng.randi_range(0, rarity_pool.size() - 1)]
 
 
 static func _roll_weighted_enum(weights: Dictionary, rng: RandomNumberGenerator) -> int:

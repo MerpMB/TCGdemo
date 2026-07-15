@@ -21,6 +21,8 @@ variant_weights = {
 3: 7.0,
 4: 3.0
 }
+allowed_sets = PackedStringArray("Core Set")
+excluded_tags = PackedStringArray("event", "limited", "developer", "debug")
 pack_scene = ExtResource("2_packscene")
 primary_color = Color(0.45, 0.22, 0.62, 1)
 accent_color = Color(0.95, 0.55, 0.95, 1)

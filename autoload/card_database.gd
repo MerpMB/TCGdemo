@@ -1,5 +1,6 @@
 extends Node
 ## Central registry of every card definition. Loads all CardData resources from resources/cards/.
+## Owns pack pool filtering — PackGenerator never inspects sets/tags directly.
 
 
 const CARDS_ROOT := "res://resources/cards"
@@ -54,6 +55,20 @@ func get_all_cards() -> Array[CardData]:
 	return all_cards
 
 
+## Candidate pool for a pack. Applies PackConfig allowed_sets, allowed_tags,
+## and excluded_tags. Empty filter arrays mean "no restriction" on that axis.
+func get_cards_for_pack(pack_config: PackConfig) -> Array[CardData]:
+	var pool: Array[CardData] = []
+	if pack_config == null:
+		push_warning("CardDatabase.get_cards_for_pack: pack_config is null.")
+		return pool
+
+	for card in _cards_by_id.values():
+		if _card_matches_pack(card, pack_config):
+			pool.append(card)
+	return pool
+
+
 func register_card(card: CardData) -> void:
 	if card.card_id.is_empty():
 		push_warning("CardDatabase: attempted to register a card with an empty id.")
@@ -66,6 +81,29 @@ func register_card(card: CardData) -> void:
 	_cards_by_id[card.card_id] = card
 	_add_to_rarity_bucket(card)
 	_add_to_set_bucket(card)
+
+
+func _card_matches_pack(card: CardData, pack_config: PackConfig) -> bool:
+	if not pack_config.allowed_sets.is_empty():
+		if not pack_config.allowed_sets.has(card.card_set):
+			return false
+
+	if not pack_config.allowed_tags.is_empty():
+		if not _card_has_any_tag(card, pack_config.allowed_tags):
+			return false
+
+	if not pack_config.excluded_tags.is_empty():
+		if _card_has_any_tag(card, pack_config.excluded_tags):
+			return false
+
+	return true
+
+
+func _card_has_any_tag(card: CardData, tags: PackedStringArray) -> bool:
+	for tag in tags:
+		if card.tags.has(tag):
+			return true
+	return false
 
 
 func _load_all_cards() -> void:

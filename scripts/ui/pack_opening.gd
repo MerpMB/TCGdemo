@@ -1,5 +1,5 @@
 extends Control
-## Pack opening — auto-opens on entry, reveal cards, return to menu.
+## Pack opening orchestration — layout math and FX live in PackLayout / PackAnimation.
 
 
 enum FlowState {
@@ -12,14 +12,6 @@ enum FlowState {
 
 const CARD_SCENE := preload("res://scenes/Card.tscn")
 const FALLBACK_PACK_SCENE := preload("res://scenes/Pack.tscn")
-
-const BASE_CARD_SIZE := Vector2(140, 200)
-const GRID_COLUMNS := 4
-const GRID_SPACING := 12.0
-const INNER_PADDING := 8.0
-## Extra reserved space so the grid never overlaps the header/footer.
-const HEADER_GAP := 20.0
-const FOOTER_GAP := 16.0
 
 
 @onready var _pack_anchor: CenterContainer = %PackAnchor
@@ -90,24 +82,12 @@ func _clear_pack_visual() -> void:
 
 func _run_opening_sequence() -> void:
 	_state = FlowState.PACK_ANIMATING
-	await _run_pack_sequence()
+	await PackAnimation.run_pack_sequence(_pack_scene)
+	_clear_pack_visual()
 	await _launch_cards_into_grid()
 	_state = FlowState.REVEALING
 	_enable_card_reveals()
 	_status_label.text = "Tap each card to reveal (%d / %d)" % [_revealed_count, _pack_cards.size()]
-
-
-func _run_pack_sequence() -> void:
-	if _pack_scene == null:
-		return
-
-	_pack_scene.shake()
-	await _pack_scene.shake_finished
-	_pack_scene.open()
-	await _pack_scene.open_finished
-	_pack_scene.explode()
-	await _pack_scene.explode_finished
-	_clear_pack_visual()
 
 
 func _show_pack_stage() -> void:
@@ -132,7 +112,10 @@ func _launch_cards_into_grid() -> void:
 	await _await_layout_ready()
 
 	var burst_origin := _get_pack_burst_origin()
-	var layout := _compute_card_layout(_pack_cards.size())
+	var layout := PackLayout.compute_card_layout(
+		_pack_cards.size(),
+		PackLayout.usable_card_area(_card_fly_layer.get_rect())
+	)
 	_layout_scale = layout.card_scale
 	var slot_centers: Array[Vector2] = layout.centers
 
@@ -141,12 +124,12 @@ func _launch_cards_into_grid() -> void:
 		card_scene.flipped.connect(_on_card_flipped)
 		_card_fly_layer.add_child(card_scene)
 		card_scene.setup(_pack_cards[index], CardScene.DisplayMode.PACK)
-		_prepare_card_for_layout(card_scene, _layout_scale)
+		PackLayout.prepare_card_for_layout(card_scene, _layout_scale)
 		card_scene.set_pack_reveal_enabled(false)
 		_card_scenes.append(card_scene)
 		var global_center := _card_fly_layer.global_position + slot_centers[index]
 		await card_scene.await_arrival(burst_origin, global_center)
-		_apply_card_slot_position(card_scene, slot_centers[index], _layout_scale)
+		PackLayout.apply_card_slot_position(card_scene, slot_centers[index], _layout_scale)
 
 
 func _get_pack_burst_origin() -> Vector2:
@@ -160,109 +143,21 @@ func _await_layout_ready() -> void:
 	await get_tree().process_frame
 
 
-## Playable grid rect = the fly layer (already sized by the container to the
-## space between header and footer) minus safe margins plus extra header/footer
-## breathing room. The grid is centered inside whatever remains.
-func _get_usable_card_area() -> Rect2:
-	var rect := _card_fly_layer.get_rect()
-	rect.position.x += INNER_PADDING
-	rect.position.y += HEADER_GAP
-	rect.size.x -= INNER_PADDING * 2.0
-	rect.size.y -= (HEADER_GAP + FOOTER_GAP)
-	rect.size.x = maxf(rect.size.x, 0.0)
-	rect.size.y = maxf(rect.size.y, 0.0)
-	return rect
-
-
-func _scaled_card_size(card_scale: float) -> Vector2:
-	return BASE_CARD_SIZE * card_scale
-
-
-func _scaled_card_half_size(card_scale: float) -> Vector2:
-	return _scaled_card_size(card_scale) * 0.5
-
-
-func _measure_grid_size(columns: int, rows: int, card_size: Vector2) -> Vector2:
-	return Vector2(
-		columns * card_size.x + (columns - 1) * GRID_SPACING,
-		rows * card_size.y + (rows - 1) * GRID_SPACING,
-	)
-
-
-func _resolve_card_scale(columns: int, rows: int, available: Rect2) -> float:
-	var full_grid_size := _measure_grid_size(columns, rows, BASE_CARD_SIZE)
-	if full_grid_size.x <= available.size.x and full_grid_size.y <= available.size.y:
-		return 1.0
-
-	var scale_x := available.size.x / full_grid_size.x if full_grid_size.x > 0.0 else 1.0
-	var scale_y := available.size.y / full_grid_size.y if full_grid_size.y > 0.0 else 1.0
-	return minf(minf(scale_x, scale_y), 1.0)
-
-
-func _prepare_card_for_layout(card_scene: CardScene, card_scale: float) -> void:
-	card_scene.custom_minimum_size = BASE_CARD_SIZE
-	card_scene.size = BASE_CARD_SIZE
-	card_scene.prepare_layout_scale(card_scale)
-
-
-func _apply_card_slot_position(card_scene: CardScene, center_local: Vector2, card_scale: float) -> void:
-	_prepare_card_for_layout(card_scene, card_scale)
-	card_scene.position = center_local - _scaled_card_half_size(card_scale)
-	card_scene.scale = Vector2.ONE * card_scale
-
-
 func _calculate_slot_positions(count: int) -> Array[Vector2]:
-	var layout := _compute_card_layout(count)
+	var layout := PackLayout.compute_card_layout(
+		count,
+		PackLayout.usable_card_area(_card_fly_layer.get_rect())
+	)
 	_layout_scale = layout.card_scale
 	return layout.centers
-
-
-func _compute_card_layout(count: int) -> Dictionary:
-	var available := _get_usable_card_area()
-	var columns := _resolve_grid_columns(count, available.size.x)
-	var rows := int(ceil(float(count) / float(columns)))
-
-	var card_scale := _resolve_card_scale(columns, rows, available)
-	var card_size := _scaled_card_size(card_scale)
-	var grid_size := _measure_grid_size(columns, rows, card_size)
-
-	var origin := available.position + (available.size - grid_size) * 0.5
-	origin.x = clampf(origin.x, available.position.x, maxf(available.position.x, available.position.x + available.size.x - grid_size.x))
-	origin.y = maxf(origin.y, available.position.y)
-
-	var centers: Array[Vector2] = []
-
-	for index in count:
-		var row := int(index / columns)
-		var col := index % columns
-		var cards_in_row := mini(columns, count - row * columns)
-		var row_width := cards_in_row * card_size.x + (cards_in_row - 1) * GRID_SPACING
-		var row_offset_x := (grid_size.x - row_width) * 0.5
-		var center := origin + Vector2(
-			row_offset_x + col * (card_size.x + GRID_SPACING) + card_size.x * 0.5,
-			row * (card_size.y + GRID_SPACING) + card_size.y * 0.5,
-		)
-		centers.append(center)
-
-	return {
-		"card_scale": card_scale,
-		"centers": centers,
-	}
-
-
-func _resolve_grid_columns(count: int, available_width: float) -> int:
-	var preferred := GRID_COLUMNS if count > GRID_COLUMNS else count
-	var max_fit := int((available_width + GRID_SPACING) / (BASE_CARD_SIZE.x + GRID_SPACING))
-	return clampi(mini(preferred, max_fit), 1, count)
 
 
 func _reposition_cards_in_grid() -> void:
 	if _card_scenes.is_empty() or not _play_area.visible:
 		return
-
 	var centers := _calculate_slot_positions(_card_scenes.size())
 	for index in _card_scenes.size():
-		_apply_card_slot_position(_card_scenes[index], centers[index], _layout_scale)
+		PackLayout.apply_card_slot_position(_card_scenes[index], centers[index], _layout_scale)
 
 
 func _on_viewport_resized() -> void:
@@ -285,20 +180,10 @@ func _on_card_flipped(_card_scene: CardScene) -> void:
 
 	var card_data := _card_scene.get_card_data()
 	if card_data and card_data.rarity == CardData.Rarity.LEGENDARY:
-		_play_legendary_flash()
+		PackAnimation.play_legendary_flash(self, _screen_flash)
 
 	if _revealed_count >= _pack_cards.size():
 		_finish_pack()
-
-
-func _play_legendary_flash() -> void:
-	_screen_flash.color = Color(0.95, 0.78, 0.18, 0.0)
-	_screen_flash.show()
-	var tween := create_tween()
-	tween.tween_property(_screen_flash, "color:a", 0.35, 0.08)
-	tween.tween_property(_screen_flash, "color:a", 0.0, 0.22)
-	await tween.finished
-	_screen_flash.hide()
 
 
 func _finish_pack() -> void:

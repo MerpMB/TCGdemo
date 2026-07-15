@@ -1,7 +1,7 @@
 class_name PackConfig
 extends Resource
 ## Pack definition loaded from .tres files under resources/packs/.
-## Drives generation weights and pack opening presentation.
+## Drives generation weights, card pool filters, and pack opening presentation.
 
 
 @export var pack_id: String = ""
@@ -9,6 +9,12 @@ extends Resource
 @export var cards_per_pack: int = 7
 @export var rarity_weights: Dictionary = {}
 @export var variant_weights: Dictionary = {}
+## If non-empty, only cards whose card_set is in this list are eligible.
+@export var allowed_sets: PackedStringArray = []
+## If non-empty, a card must have at least one of these tags to be eligible.
+@export var allowed_tags: PackedStringArray = []
+## Cards with any of these tags are never eligible for this pack.
+@export var excluded_tags: PackedStringArray = []
 @export var pack_scene: PackedScene
 @export var pack_back: Texture2D
 @export var pack_icon: Texture2D

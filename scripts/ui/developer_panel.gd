@@ -41,11 +41,7 @@ func _on_give_random_pressed() -> void:
 	var pack_config := _get_dev_pack_config()
 	if pack_config == null:
 		return
-	var card := PackGenerator.generate_card(
-		CardDatabase,
-		pack_config.rarity_weights,
-		pack_config.variant_weights
-	)
+	var card := PackGenerator.generate_card(CardDatabase, pack_config)
 	if card:
 		CollectionManager.add_card(card)
 
@@ -54,11 +50,7 @@ func _give_card_of_rarity(rarity: CardData.Rarity) -> void:
 	var pack_config := _get_dev_pack_config()
 	if pack_config == null:
 		return
-	var card := PackGenerator.generate_card_of_rarity(
-		CardDatabase,
-		rarity,
-		pack_config.variant_weights
-	)
+	var card := PackGenerator.generate_card_of_rarity(CardDatabase, pack_config, rarity)
 	if card:
 		CollectionManager.add_card(card)
 

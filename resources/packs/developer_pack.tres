@@ -21,6 +21,8 @@ variant_weights = {
 3: 10.0,
 4: 10.0
 }
+allowed_sets = PackedStringArray("Developer Set")
+allowed_tags = PackedStringArray("developer")
 pack_scene = ExtResource("2_packscene")
 primary_color = Color(0.18, 0.22, 0.18, 1)
 accent_color = Color(0.95, 0.55, 0.2, 1)
