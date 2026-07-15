@@ -9,21 +9,23 @@ pack_id = "developer_pack"
 display_name = "Developer Pack"
 cards_per_pack = 7
 rarity_weights = {
-0: 25.0,
-1: 25.0,
-2: 25.0,
-3: 25.0
+0: 10.0,
+1: 15.0,
+2: 35.0,
+3: 40.0
 }
 variant_weights = {
-0: 60.0,
-1: 15.0,
-2: 5.0,
+0: 15.0,
+1: 20.0,
+2: 18.0,
 3: 10.0,
-4: 10.0
+4: 18.0,
+5: 19.0
 }
-allowed_sets = PackedStringArray("Developer Set")
-allowed_tags = PackedStringArray("developer")
+allowed_sets = PackedStringArray("Core Set", "Developer Set")
+debug_only = true
+visible_in_shop = true
 pack_scene = ExtResource("2_packscene")
 primary_color = Color(0.18, 0.22, 0.18, 1)
 accent_color = Color(0.95, 0.55, 0.2, 1)
-description = "Balanced odds for rapid framework testing."
+description = "Debug pack with elevated Epic/Legendary and special-variant rates for visual testing."

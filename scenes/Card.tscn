@@ -103,6 +103,17 @@ mouse_filter = 2
 expand_mode = 1
 stretch_mode = 6
 
+[node name="RenderLayerContainer" type="Control" parent="FlipPivot/FrontFace"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+clip_contents = true
+
 [node name="FrameTexture" type="TextureRect" parent="FlipPivot/FrontFace"]
 unique_name_in_owner = true
 visible = false
@@ -128,7 +139,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="VariantOverlay" type="Control" parent="FlipPivot/FrontFace"]
+[node name="LegacyVariantFx" type="Control" parent="FlipPivot/FrontFace"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -138,7 +149,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="NegativeOverlay" type="ColorRect" parent="FlipPivot/FrontFace/VariantOverlay"]
+[node name="NegativeOverlay" type="ColorRect" parent="FlipPivot/FrontFace/LegacyVariantFx"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
@@ -150,7 +161,7 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.02, 0.02, 0.04, 0.55)
 
-[node name="DiamondGlow" type="ColorRect" parent="FlipPivot/FrontFace/VariantOverlay"]
+[node name="DiamondGlow" type="ColorRect" parent="FlipPivot/FrontFace/LegacyVariantFx"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
@@ -162,7 +173,7 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.2, 0.55, 0.95, 0.22)
 
-[node name="FoilShine" type="ColorRect" parent="FlipPivot/FrontFace/VariantOverlay"]
+[node name="FoilShine" type="ColorRect" parent="FlipPivot/FrontFace/LegacyVariantFx"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 0
@@ -173,7 +184,7 @@ offset_bottom = 200.0
 mouse_filter = 2
 color = Color(1, 1, 1, 0.35)
 
-[node name="AltArtIcon" type="ColorRect" parent="FlipPivot/FrontFace/VariantOverlay"]
+[node name="AltArtIcon" type="ColorRect" parent="FlipPivot/FrontFace/LegacyVariantFx"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
@@ -185,7 +196,7 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.5, 0.85, 1, 0.14)
 
-[node name="DiamondIcon" type="ColorRect" parent="FlipPivot/FrontFace/VariantOverlay"]
+[node name="DiamondIcon" type="ColorRect" parent="FlipPivot/FrontFace/LegacyVariantFx"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1

@@ -19,6 +19,9 @@ const FALLBACK_PACK_SCENE := preload("res://scenes/Pack.tscn")
 @onready var _card_fly_layer: Control = %CardFlyLayer
 @onready var _footer: VBoxContainer = %Footer
 @onready var _skip_button: Button = %SkipButton
+@onready var _reveal_all_button: Button = %RevealAllButton
+@onready var _result_actions: HBoxContainer = %ResultActions
+@onready var _exit_button: Button = %ExitButton
 @onready var _continue_button: Button = %ContinueButton
 @onready var _status_label: Label = %StatusLabel
 @onready var _screen_flash: ColorRect = %ScreenFlash
@@ -30,19 +33,32 @@ var _card_scenes: Array[CardScene] = []
 var _revealed_count := 0
 var _cards_added := false
 var _layout_scale := 1.0
+var _skip_requested := false
+var _flash_tween: Tween
 
 
 func _ready() -> void:
 	_screen_flash.z_index = 100
 	_skip_button.pressed.connect(_on_skip_pressed)
+	_reveal_all_button.pressed.connect(_on_reveal_all_pressed)
+	_exit_button.pressed.connect(_on_exit_pressed)
 	_continue_button.pressed.connect(_on_continue_pressed)
-	_continue_button.hide()
+	_hide_result_actions()
 	_skip_button.hide()
+	_reveal_all_button.hide()
 	resized.connect(_on_viewport_resized)
 	_prepare_and_open()
 
 
 func _prepare_and_open() -> void:
+	_hide_result_actions()
+	_skip_button.hide()
+	_skip_button.disabled = false
+	_reveal_all_button.hide()
+	_reveal_all_button.disabled = false
+	_skip_requested = false
+	_state = FlowState.PACK_ANIMATING
+	_stop_screen_flash()
 	_clear_cards()
 	var pack_config := GameManager.get_selected_pack()
 	if pack_config == null:
@@ -55,6 +71,7 @@ func _prepare_and_open() -> void:
 	_spawn_pack_visual()
 	_show_pack_stage()
 	_status_label.text = "Opening your pack..."
+	_skip_button.show()
 	call_deferred("_run_opening_sequence")
 
 
@@ -82,12 +99,20 @@ func _clear_pack_visual() -> void:
 
 func _run_opening_sequence() -> void:
 	_state = FlowState.PACK_ANIMATING
-	await PackAnimation.run_pack_sequence(_pack_scene)
+	await PackAnimation.run_pack_sequence(_pack_scene, _is_skip_requested)
+	if _skip_requested:
+		return
 	_clear_pack_visual()
 	await _launch_cards_into_grid()
+	if _skip_requested:
+		return
 	_state = FlowState.REVEALING
 	_enable_card_reveals()
 	_status_label.text = "Tap each card to reveal (%d / %d)" % [_revealed_count, _pack_cards.size()]
+
+
+func _is_skip_requested() -> bool:
+	return _skip_requested
 
 
 func _show_pack_stage() -> void:
@@ -110,6 +135,8 @@ func _launch_cards_into_grid() -> void:
 	_state = FlowState.CARDS_ARRIVING
 	_show_card_stage()
 	await _await_layout_ready()
+	if _skip_requested:
+		return
 
 	var burst_origin := _get_pack_burst_origin()
 	var layout := PackLayout.compute_card_layout(
@@ -120,16 +147,25 @@ func _launch_cards_into_grid() -> void:
 	var slot_centers: Array[Vector2] = layout.centers
 
 	for index in _pack_cards.size():
-		var card_scene := CARD_SCENE.instantiate() as CardScene
-		card_scene.flipped.connect(_on_card_flipped)
-		_card_fly_layer.add_child(card_scene)
-		card_scene.setup(_pack_cards[index], CardScene.DisplayMode.PACK)
-		PackLayout.prepare_card_for_layout(card_scene, _layout_scale)
-		card_scene.set_pack_reveal_enabled(false)
-		_card_scenes.append(card_scene)
+		if _skip_requested:
+			return
+		var card_scene := _create_card_scene(index)
 		var global_center := _card_fly_layer.global_position + slot_centers[index]
 		await card_scene.await_arrival(burst_origin, global_center)
+		if _skip_requested:
+			return
 		PackLayout.apply_card_slot_position(card_scene, slot_centers[index], _layout_scale)
+
+
+func _create_card_scene(index: int) -> CardScene:
+	var card_scene := CARD_SCENE.instantiate() as CardScene
+	card_scene.flipped.connect(_on_card_flipped)
+	_card_fly_layer.add_child(card_scene)
+	card_scene.setup(_pack_cards[index], CardScene.DisplayMode.PACK)
+	PackLayout.prepare_card_for_layout(card_scene, _layout_scale)
+	card_scene.set_pack_reveal_enabled(false)
+	_card_scenes.append(card_scene)
+	return card_scene
 
 
 func _get_pack_burst_origin() -> Vector2:
@@ -166,10 +202,12 @@ func _on_viewport_resized() -> void:
 
 
 func _enable_card_reveals() -> void:
-	_skip_button.show()
-	_skip_button.disabled = false
+	_skip_button.hide()
 	for card_scene in _card_scenes:
 		card_scene.set_pack_reveal_enabled(true)
+	if _revealed_count < _pack_cards.size():
+		_reveal_all_button.disabled = false
+		_reveal_all_button.show()
 	await _await_layout_ready()
 	_reposition_cards_in_grid()
 
@@ -179,8 +217,9 @@ func _on_card_flipped(_card_scene: CardScene) -> void:
 	_status_label.text = "Tap each card to reveal (%d / %d)" % [_revealed_count, _pack_cards.size()]
 
 	var card_data := _card_scene.get_card_data()
-	if card_data and card_data.rarity == CardData.Rarity.LEGENDARY:
-		PackAnimation.play_legendary_flash(self, _screen_flash)
+	if not _skip_requested and card_data and card_data.rarity == CardData.Rarity.LEGENDARY:
+		_stop_screen_flash()
+		_flash_tween = PackAnimation.play_legendary_flash(self, _screen_flash)
 
 	if _revealed_count >= _pack_cards.size():
 		_finish_pack()
@@ -192,28 +231,105 @@ func _finish_pack() -> void:
 
 	_state = FlowState.DONE
 	_skip_button.hide()
+	_reveal_all_button.hide()
+	_reveal_all_button.disabled = true
+	_stop_screen_flash()
 
 	if not _cards_added:
 		CollectionManager.add_cards(_pack_cards)
 		_cards_added = true
 
 	_status_label.text = "%d cards added to your collection!" % _pack_cards.size()
-	_continue_button.show()
+	_show_result_actions()
 	await _await_layout_ready()
 	_reposition_cards_in_grid()
 
 
+func _show_result_actions() -> void:
+	_result_actions.show()
+	_exit_button.show()
+	_continue_button.show()
+
+
+func _hide_result_actions() -> void:
+	_result_actions.hide()
+	_exit_button.hide()
+	_continue_button.hide()
+
+
 func _on_skip_pressed() -> void:
-	if _state != FlowState.REVEALING:
+	if _state == FlowState.DONE or _skip_requested or _pack_cards.is_empty():
 		return
 
+	_skip_requested = true
 	_skip_button.disabled = true
+	_skip_button.hide()
+	_status_label.text = "Skipping presentation..."
+	if _pack_scene and is_instance_valid(_pack_scene):
+		_pack_scene.stop_presentation()
 	for card_scene in _card_scenes:
-		if not card_scene.is_revealed():
+		if is_instance_valid(card_scene):
+			card_scene.stop_presentation()
+	_stop_screen_flash()
+	_land_pack_instantly()
+
+
+func _land_pack_instantly() -> void:
+	_clear_pack_visual()
+	_show_card_stage()
+	await _await_layout_ready()
+
+	var layout := PackLayout.compute_card_layout(
+		_pack_cards.size(),
+		PackLayout.usable_card_area(_card_fly_layer.get_rect())
+	)
+	_layout_scale = layout.card_scale
+	var slot_centers: Array[Vector2] = layout.centers
+
+	while _card_scenes.size() < _pack_cards.size():
+		_create_card_scene(_card_scenes.size())
+
+	for index in _card_scenes.size():
+		var card_scene := _card_scenes[index]
+		card_scene.stop_presentation()
+		PackLayout.prepare_card_for_layout(card_scene, _layout_scale)
+		PackLayout.apply_card_slot_position(card_scene, slot_centers[index], _layout_scale)
+		card_scene.set_pack_reveal_enabled(false)
+
+	_state = FlowState.REVEALING
+	_status_label.text = "Tap each card to reveal (%d / %d)" % [_revealed_count, _pack_cards.size()]
+	_enable_card_reveals()
+
+
+func _on_reveal_all_pressed() -> void:
+	if _state != FlowState.REVEALING or _reveal_all_button.disabled:
+		return
+
+	_reveal_all_button.disabled = true
+	_reveal_all_button.hide()
+	for card_scene in _card_scenes:
+		if is_instance_valid(card_scene) and not card_scene.is_revealed():
 			card_scene.reveal_instant()
+
+	if _state != FlowState.DONE:
+		_finish_pack()
+
+
+func _stop_screen_flash() -> void:
+	if _flash_tween and _flash_tween.is_valid():
+		_flash_tween.kill()
+	_flash_tween = null
+	_screen_flash.color.a = 0.0
+	_screen_flash.hide()
 
 
 func _on_continue_pressed() -> void:
+	if _state != FlowState.DONE:
+		return
+	GameManager.go_to_pack_hub()
+
+
+func _on_exit_pressed() -> void:
 	GameManager.go_to_main_menu()
 
 

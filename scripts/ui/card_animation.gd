@@ -1,7 +1,7 @@
 class_name CardAnimation
 extends RefCounted
 ## Card motion and FX tweens. Host Control (Card root) is the only movement target
-## besides FlipPivot.scale.x and allowed FX (FoilShine sweep, spark/glow opacity).
+## besides FlipPivot.scale.x and allowed FX (spark/glow opacity).
 
 
 const HOVER_SCALE := 1.06
@@ -23,6 +23,7 @@ var audio_legendary: AudioStreamPlayer
 var base_scale := Vector2.ONE
 var motion_tween: Tween
 var variant_tween: Tween
+var presentation_cancelled := false
 
 ## Callables provided by CardScene orchestration.
 var show_face_up: Callable
@@ -60,6 +61,7 @@ func setup_flip_pivot() -> void:
 
 
 func play_arrival(from_global: Vector2, to_global: Vector2, half_size: Vector2) -> void:
+	presentation_cancelled = false
 	host.global_position = from_global - half_size
 	host.scale = Vector2.ZERO
 	host.rotation = randf_range(-0.35, 0.35)
@@ -79,11 +81,12 @@ func play_arrival(from_global: Vector2, to_global: Vector2, half_size: Vector2) 
 
 func await_arrival(from_global: Vector2, to_global: Vector2, half_size: Vector2) -> void:
 	play_arrival(from_global, to_global, half_size)
-	if motion_tween:
-		await motion_tween.finished
+	while is_motion_animating():
+		await host.get_tree().process_frame
 
 
 func play_pack_reveal(card_data: CardData, instant: bool) -> void:
+	presentation_cancelled = false
 	var rarity := card_data.rarity
 	var duration := 0.12 if instant else CardVisualLibrary.get_reveal_duration(rarity)
 	var lift := 0.0 if instant else CardVisualLibrary.get_reveal_lift(rarity)
@@ -105,7 +108,9 @@ func play_pack_reveal(card_data: CardData, instant: bool) -> void:
 		)
 
 	motion_tween.tween_property(flip_pivot, "scale:x", 0.0, duration * 0.45)
-	await motion_tween.finished
+	await _await_motion()
+	if presentation_cancelled:
+		return
 
 	if show_face_up.is_valid():
 		show_face_up.call()
@@ -114,12 +119,16 @@ func play_pack_reveal(card_data: CardData, instant: bool) -> void:
 	motion_tween = host.create_tween()
 	motion_tween.tween_property(flip_pivot, "scale:x", 1.0, duration * 0.45)
 	motion_tween.parallel().tween_property(host, "position:y", rest_y, duration * 0.45)
-	await motion_tween.finished
+	await _await_motion()
+	if presentation_cancelled:
+		return
 
 	host.position.y = rest_y
 
 	if not instant:
 		await play_rarity_finish(rarity)
+		if presentation_cancelled:
+			return
 
 	play_variant_idle(card_data)
 	if on_reveal_finished.is_valid():
@@ -134,7 +143,9 @@ func play_rarity_finish(rarity: CardData.Rarity) -> void:
 			motion_tween = host.create_tween()
 			motion_tween.tween_property(host, "scale", base_scale * 1.08, 0.12)
 			motion_tween.tween_property(host, "scale", base_scale, 0.14)
-			await motion_tween.finished
+			await _await_motion()
+			if presentation_cancelled:
+				return
 		CardData.Rarity.LEGENDARY:
 			_play(audio_legendary)
 			legendary_spark.visible = true
@@ -144,91 +155,27 @@ func play_rarity_finish(rarity: CardData.Rarity) -> void:
 			motion_tween.set_parallel(true)
 			motion_tween.tween_property(host, "scale", base_scale * 1.16, 0.18)
 			motion_tween.tween_property(legendary_spark, "modulate:a", 0.85, 0.12)
-			await motion_tween.finished
+			await _await_motion()
+			if presentation_cancelled:
+				return
 			motion_tween = host.create_tween()
 			motion_tween.tween_property(host, "scale", base_scale, 0.2)
 			motion_tween.parallel().tween_property(legendary_spark, "modulate:a", 0.0, 0.2)
-			await motion_tween.finished
+			await _await_motion()
+			if presentation_cancelled:
+				return
 			legendary_spark.visible = false
 
 
-func play_variant_idle(card_data: CardData) -> void:
+func play_variant_idle(_card_data: CardData) -> void:
+	## Variant motion is shader-driven (TIME uniforms). No looping tweens per card.
 	kill_variant_tween()
-
-	if card_data == null:
-		return
-
-	match card_data.variant:
-		CardData.Variant.FOIL:
-			_start_foil_idle()
-		CardData.Variant.NEGATIVE:
-			_start_negative_idle()
-		CardData.Variant.DIAMOND:
-			_start_diamond_idle()
 
 
 func kill_variant_tween() -> void:
 	if variant_tween and variant_tween.is_valid():
 		variant_tween.kill()
 	variant_tween = null
-
-
-func _start_foil_idle() -> void:
-	if foil_shine == null or not foil_shine.visible:
-		return
-	var material := foil_shine.material as ShaderMaterial
-	if material == null:
-		return
-	material.set_shader_parameter("sweep", -0.25)
-	variant_tween = host.create_tween().set_loops()
-	variant_tween.tween_method(
-		func(value: float) -> void:
-			if material:
-				material.set_shader_parameter("sweep", value),
-		-0.25,
-		1.25,
-		CardVisualLibrary.FOIL_SWEEP_DURATION
-	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	variant_tween.tween_interval(CardVisualLibrary.FOIL_SWEEP_PAUSE)
-
-
-func _start_negative_idle() -> void:
-	var edge_material := negative_overlay.material as ShaderMaterial if negative_overlay else null
-	var art_material := art_texture.material as ShaderMaterial if art_texture else null
-	if edge_material == null and art_material == null:
-		return
-	variant_tween = host.create_tween().set_loops()
-	variant_tween.tween_method(
-		func(value: float) -> void:
-			if edge_material:
-				edge_material.set_shader_parameter("pulse", value)
-			if art_material:
-				art_material.set_shader_parameter("pulse", value),
-		0.0,
-		1.0,
-		CardVisualLibrary.NEGATIVE_PULSE_DURATION * 0.5
-	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	variant_tween.tween_method(
-		func(value: float) -> void:
-			if edge_material:
-				edge_material.set_shader_parameter("pulse", value)
-			if art_material:
-				art_material.set_shader_parameter("pulse", value),
-		1.0,
-		0.0,
-		CardVisualLibrary.NEGATIVE_PULSE_DURATION * 0.5
-	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
-
-func _start_diamond_idle() -> void:
-	if diamond_glow == null or not diamond_glow.visible:
-		return
-	diamond_glow.modulate = Color(1.0, 1.0, 1.0, 0.88)
-	variant_tween = host.create_tween().set_loops()
-	variant_tween.tween_property(diamond_glow, "modulate:a", 1.0, 1.6) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	variant_tween.tween_property(diamond_glow, "modulate:a", 0.82, 1.9) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 func play_click() -> void:
@@ -255,6 +202,25 @@ func tween_hover_out() -> void:
 func kill_motion_tween() -> void:
 	if motion_tween and motion_tween.is_valid():
 		motion_tween.kill()
+	motion_tween = null
+
+
+func is_motion_animating() -> bool:
+	return motion_tween != null and motion_tween.is_valid() and motion_tween.is_running()
+
+
+func _await_motion() -> void:
+	while is_motion_animating():
+		await host.get_tree().process_frame
+
+
+func stop_all() -> void:
+	presentation_cancelled = true
+	kill_motion_tween()
+	kill_variant_tween()
+	_stop(audio_flip)
+	_stop(audio_rare)
+	_stop(audio_legendary)
 
 
 func _play(player: AudioStreamPlayer) -> void:
@@ -262,3 +228,8 @@ func _play(player: AudioStreamPlayer) -> void:
 		play_audio.call(player)
 	elif player and player.stream:
 		player.play()
+
+
+func _stop(player: AudioStreamPlayer) -> void:
+	if player:
+		player.stop()

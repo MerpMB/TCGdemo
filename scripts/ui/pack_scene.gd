@@ -56,6 +56,19 @@ func explode() -> void:
 	_animation_player.play("explode")
 
 
+func is_presentation_playing() -> bool:
+	return _animation_player.is_playing()
+
+
+func stop_presentation() -> void:
+	_animation_player.stop()
+	_audio_shake.stop()
+	_audio_open.stop()
+	_audio_explode.stop()
+	_glow.hide()
+	_pack_sprite.rotation = 0.0
+
+
 func _apply_profile_colors() -> void:
 	var sprite_style := StyleBoxFlat.new()
 	sprite_style.bg_color = primary_color

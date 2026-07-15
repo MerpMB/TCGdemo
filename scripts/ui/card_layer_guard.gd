@@ -8,9 +8,10 @@ const PROTECTED_LAYER_PATHS := [
 	"FlipPivot/BackFace/BackTexture",
 	"FlipPivot/FrontFace",
 	"FlipPivot/FrontFace/ArtTexture",
+	"FlipPivot/FrontFace/RenderLayerContainer",
 	"FlipPivot/FrontFace/FrameTexture",
 	"FlipPivot/FrontFace/FramePanel",
-	"FlipPivot/FrontFace/VariantOverlay",
+	"FlipPivot/FrontFace/LegacyVariantFx",
 	"FlipPivot/FrontFace/LegendarySpark",
 ]
 

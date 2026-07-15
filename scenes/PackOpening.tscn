@@ -91,22 +91,68 @@ visible = false
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="SkipButton" type="Button" parent="MarginContainer/VBox/Footer"]
+[node name="RevealAllButton" type="Button" parent="MarginContainer/VBox/Footer"]
 unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 17
-text = "Skip"
+theme_override_font_sizes/font_size = 18
+text = "Reveal All"
 script = ExtResource("2_menubtn")
 
-[node name="ContinueButton" type="Button" parent="MarginContainer/VBox/Footer"]
+[node name="ResultActions" type="HBoxContainer" parent="MarginContainer/VBox/Footer"]
 unique_name_in_owner = true
 visible = false
-custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ExitButton" type="Button" parent="MarginContainer/VBox/Footer/ResultActions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.0
+theme_override_font_sizes/font_size = 17
+text = "Exit"
+script = ExtResource("2_menubtn")
+
+[node name="ContinueButton" type="Button" parent="MarginContainer/VBox/Footer/ResultActions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.0
 theme_override_font_sizes/font_size = 18
 text = "Continue"
+script = ExtResource("2_menubtn")
+
+[node name="SkipSafeArea" type="MarginContainer" parent="."]
+z_index = 10
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 40
+
+[node name="SkipRow" type="HBoxContainer" parent="SkipSafeArea"]
+layout_mode = 2
+mouse_filter = 2
+alignment = 2
+
+[node name="SkipButton" type="Button" parent="SkipSafeArea/SkipRow"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(96, 52)
+layout_mode = 2
+size_flags_vertical = 0
+mouse_filter = 0
+theme_override_font_sizes/font_size = 17
+text = "Skip"
 script = ExtResource("2_menubtn")

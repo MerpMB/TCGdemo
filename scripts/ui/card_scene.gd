@@ -7,8 +7,8 @@ extends Control
 ##     modulate / z_index for motion.
 ##   - FlipPivot may ONLY change scale.x (horizontal flip).
 ##   - Protected render layers never receive movement transforms.
-##   - FX (FoilShine, NegativeOverlay, DiamondGlow, RarityGlow, LegendarySpark) may animate
-##     opacity, shader uniforms, or sweep only.
+##   - FX (FoilShine, NegativeOverlay, DiamondGlow, RarityGlow, LegendarySpark,
+##     RenderLayerContainer) may animate opacity, shader uniforms, or sweep only.
 
 
 signal flipped(card_scene: CardScene)
@@ -32,6 +32,7 @@ enum DisplayMode {
 @onready var _frame_panel: Control = %FramePanel
 @onready var _card_body: ColorRect = %CardBody
 @onready var _art_texture: TextureRect = %ArtTexture
+@onready var _render_layer_container: Control = %RenderLayerContainer
 @onready var _rarity_glow: ColorRect = %RarityGlow
 @onready var _negative_overlay: ColorRect = %NegativeOverlay
 @onready var _foil_shine: ColorRect = %FoilShine
@@ -77,7 +78,8 @@ func _bind_helpers() -> void:
 		_back_texture, _back_panel, _back_face, _front_face,
 		_flip_pivot, _flip_button, _rarity_glow,
 		_negative_overlay, _foil_shine, _alt_art_icon,
-		_diamond_glow, _diamond_icon, _legendary_spark, _owned_count_badge
+		_diamond_glow, _diamond_icon, _legendary_spark, _owned_count_badge,
+		_render_layer_container
 	)
 	_renderer.host_size = size
 
@@ -100,8 +102,9 @@ func _setup_flip_pivot_and_cache_rest() -> void:
 	_layer_guard.cache_rest()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	_layer_guard.assert_unmoved("process")
+	_renderer.process_variant_idle(delta)
 
 
 func setup(card_data: CardData, mode: DisplayMode = DisplayMode.PACK) -> void:
@@ -162,12 +165,19 @@ func reveal_instant() -> void:
 	if _is_revealed or _card_data == null:
 		return
 	if _is_revealing:
-		_animation.kill_motion_tween()
+		_animation.stop_all()
 	_is_revealing = true
 	_renderer.show_face_up()
 	_flip_pivot.scale.x = 1.0
 	_animation.play_variant_idle(_card_data)
-	_finish_reveal()
+	_finish_reveal(false)
+
+
+func stop_presentation() -> void:
+	_animation.stop_all()
+	rotation = 0.0
+	modulate.a = 1.0
+	_legendary_spark.hide()
 
 
 func _configure_mode() -> void:
@@ -201,10 +211,11 @@ func _on_set_rarity_glow(alpha: float) -> void:
 	_renderer.set_rarity_glow(_card_data, alpha)
 
 
-func _finish_reveal() -> void:
+func _finish_reveal(play_sound: bool = true) -> void:
 	_is_revealed = true
 	_is_revealing = false
-	_renderer.play_audio(_audio_flip)
+	if play_sound:
+		_renderer.play_audio(_audio_flip)
 	_layer_guard.assert_unmoved("after_reveal")
 	flipped.emit(self)
 	reveal_finished.emit(self)

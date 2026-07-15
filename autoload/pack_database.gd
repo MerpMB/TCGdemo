@@ -27,6 +27,27 @@ func get_all_packs() -> Array[PackConfig]:
 	return all_packs
 
 
+## Packs shown in Pack Hub — visible_in_shop only (data-driven, no manual list).
+func get_hub_packs() -> Array[PackConfig]:
+	var hub_packs: Array[PackConfig] = []
+	for pack in get_all_packs():
+		if pack.visible_in_shop:
+			hub_packs.append(pack)
+	return hub_packs
+
+
+## Player-facing packs — excludes debug_only and hidden shop entries.
+func get_shop_packs() -> Array[PackConfig]:
+	var shop_packs: Array[PackConfig] = []
+	for pack in get_all_packs():
+		if pack.debug_only:
+			continue
+		if not pack.visible_in_shop:
+			continue
+		shop_packs.append(pack)
+	return shop_packs
+
+
 func register_pack(pack: PackConfig) -> void:
 	if pack.pack_id.is_empty():
 		push_warning("PackDatabase: attempted to register a pack with an empty id.")

@@ -34,7 +34,7 @@ func _on_generate_pack_pressed() -> void:
 		if not packs.is_empty():
 			GameManager.set_selected_pack(packs[0].pack_id)
 	GameManager.hide_developer_panel()
-	GameManager.go_to_pack_opening()
+	GameManager.go_to_pack_hub()
 
 
 func _on_give_random_pressed() -> void:

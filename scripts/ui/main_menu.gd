@@ -1,5 +1,5 @@
 extends Control
-## Main menu — Open Pack, Collection, Exit.
+## Main menu — Pack Hub, Collection, Exit.
 
 
 @onready var _open_pack_button: Button = %OpenPackButton
@@ -10,8 +10,7 @@ extends Control
 
 
 func _ready() -> void:
-	GameManager.set_selected_pack("starter_pack")
-	_open_pack_button.pressed.connect(func() -> void: GameManager.go_to_pack_opening())
+	_open_pack_button.pressed.connect(GameManager.go_to_pack_hub)
 	_collection_button.pressed.connect(func() -> void: GameManager.go_to_collection())
 	_exit_button.pressed.connect(func() -> void: GameManager.quit_game())
 

@@ -3,6 +3,7 @@ extends Node
 
 
 const SCENE_MAIN_MENU := "res://scenes/MainMenu.tscn"
+const SCENE_PACK_HUB := "res://scenes/PackHub.tscn"
 const SCENE_PACK_OPENING := "res://scenes/PackOpening.tscn"
 const SCENE_COLLECTION := "res://scenes/Collection.tscn"
 const SCENE_DECK_BUILDER := "res://scenes/DeckBuilder.tscn"
@@ -36,6 +37,10 @@ func go_to_main_menu() -> void:
 	change_scene(SCENE_MAIN_MENU)
 
 
+func go_to_pack_hub() -> void:
+	change_scene(SCENE_PACK_HUB)
+
+
 func go_to_pack_opening() -> void:
 	change_scene(SCENE_PACK_OPENING)
 
@@ -45,6 +50,9 @@ func get_selected_pack() -> PackConfig:
 		var pack := PackDatabase.get_pack(selected_pack_id)
 		if pack:
 			return pack
+	var hub_packs := PackDatabase.get_hub_packs()
+	if not hub_packs.is_empty():
+		return hub_packs[0]
 	var all_packs := PackDatabase.get_all_packs()
 	if all_packs.is_empty():
 		return null

@@ -18,13 +18,14 @@ config/name="TCG Framework"
 config/description="Reusable trading card game framework showcase."
 run/main_scene="res://scenes/MainMenu.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
-config/icon="res://icon.svg"
+config/icon="res://icon.png"
 
 [autoload]
 
 GameManager="*res://autoload/game_manager.gd"
 CardDatabase="*res://autoload/card_database.gd"
 PackDatabase="*res://autoload/pack_database.gd"
+PackInventoryManager="*res://autoload/pack_inventory_manager.gd"
 CollectionManager="*res://autoload/collection_manager.gd"
 SaveManager="*res://autoload/save_manager.gd"
 

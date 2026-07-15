@@ -1,0 +1,162 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/pack_hub.gd" id="1_hub"]
+[ext_resource type="Script" path="res://scripts/ui/menu_button.gd" id="2_button"]
+
+[node name="PackHub" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_hub")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.08, 0.09, 0.12, 1)
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 32
+
+[node name="VBox" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Pack Hub"
+horizontal_alignment = 1
+
+[node name="SelectorLabel" type="Label" parent="MarginContainer/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+theme_override_colors/font_color = Color(0.7, 0.74, 0.82, 1)
+text = "Your Packs"
+
+[node name="SelectorScroll" type="ScrollContainer" parent="MarginContainer/VBox"]
+custom_minimum_size = Vector2(0, 64)
+layout_mode = 2
+horizontal_scroll_mode = 1
+vertical_scroll_mode = 0
+
+[node name="SelectorRow" type="HBoxContainer" parent="MarginContainer/VBox/SelectorScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="PreviewAnchor" type="CenterContainer" parent="MarginContainer/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 270)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="PackNameLabel" type="Label" parent="MarginContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Starter Pack"
+horizontal_alignment = 1
+
+[node name="PackDescriptionLabel" type="Label" parent="MarginContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.7, 0.74, 0.82, 1)
+text = ""
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="OwnedCountLabel" type="Label" parent="MarginContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 17
+theme_override_colors/font_color = Color(0.55, 0.82, 0.62, 1)
+text = "Owned: 99"
+horizontal_alignment = 1
+
+[node name="StatusLabel" type="Label" parent="MarginContainer/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.7, 0.74, 0.82, 1)
+text = "Ready to open."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="OpenPackButton" type="Button" parent="MarginContainer/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 20
+text = "OPEN PACK"
+script = ExtResource("2_button")
+
+[node name="ClaimsTitle" type="Label" parent="MarginContainer/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Free Claim"
+
+[node name="StarterClaimRow" type="HBoxContainer" parent="MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Label" type="Label" parent="MarginContainer/VBox/StarterClaimRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 16
+text = "Starter Pack"
+vertical_alignment = 1
+
+[node name="ClaimStarterButton" type="Button" parent="MarginContainer/VBox/StarterClaimRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(140, 52)
+layout_mode = 2
+theme_override_font_sizes/font_size = 17
+text = "Claim"
+script = ExtResource("2_button")
+
+[node name="DeveloperClaimRow" type="HBoxContainer" parent="MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Label" type="Label" parent="MarginContainer/VBox/DeveloperClaimRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 16
+text = "Developer Pack"
+vertical_alignment = 1
+
+[node name="ClaimDeveloperButton" type="Button" parent="MarginContainer/VBox/DeveloperClaimRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(140, 52)
+layout_mode = 2
+theme_override_font_sizes/font_size = 17
+text = "Claim"
+script = ExtResource("2_button")
+
+[node name="BackButton" type="Button" parent="MarginContainer/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 17
+text = "Back to Main Menu"
+script = ExtResource("2_button")

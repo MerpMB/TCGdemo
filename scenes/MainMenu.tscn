@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_menu"]
 [ext_resource type="Script" path="res://scripts/ui/menu_button.gd" id="2_menubtn"]
+[ext_resource type="Texture2D" path="res://assets/branding/logo.png" id="3_logo"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -43,11 +44,15 @@ size_flags_horizontal = 3
 theme_override_constants/separation = 16
 alignment = 1
 
-[node name="TitleLabel" type="Label" parent="MarginContainer/CenterContainer/VBox"]
+[node name="Logo" type="TextureRect" parent="MarginContainer/CenterContainer/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(280, 280)
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
-text = "TCGdemo"
-horizontal_alignment = 1
+size_flags_horizontal = 4
+texture = ExtResource("3_logo")
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 1
 
 [node name="CollectionCountLabel" type="Label" parent="MarginContainer/CenterContainer/VBox"]
 unique_name_in_owner = true
@@ -76,7 +81,7 @@ custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 20
-text = "Open Pack"
+text = "Pack Hub"
 script = ExtResource("2_menubtn")
 
 [node name="CollectionButton" type="Button" parent="MarginContainer/CenterContainer/VBox"]

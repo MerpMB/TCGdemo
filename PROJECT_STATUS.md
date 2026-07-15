@@ -60,7 +60,10 @@ The framework prototype is fully playable on mobile-first portrait layouts.
 | Full-art renderer | ✓ |
 | Asset-based frames (`assets/frames/`) | ✓ |
 | Asset-based card backs (`assets/backs/`) | ✓ |
-| Variant shader polish (Foil, Diamond, Negative) | ✓ |
+| Production asset pipeline (`docs/ASSET_PIPELINE.md`) | ✓ |
+| Variant Material System (Foil production stack) | ✓ |
+| Gold Variant Material (production stack) | ✓ |
+| Variant shader polish (Diamond, Negative legacy) | ✓ |
 | Duplicate stacking (gallery view-only) | ✓ |
 | Owned-count badges (`×N`) | ✓ |
 | Card Viewer (full-screen, art-only) | ✓ |
@@ -97,10 +100,11 @@ UI orchestrators
 ```
 CardScene
     ├── CardRenderer        — applies CardData visuals to node refs
+    ├── VariantRenderer     — generic layered material stack (via RenderLayerContainer)
     ├── CardAnimation       — arrival, reveal, variant idle FX
     ├── CardInteraction     — gallery tap / hover
     ├── CardLayerGuard      — debug protected-layer drift checks
-    └── CardVisualLibrary   — shaders, frames, backs, timing constants
+    └── CardVisualLibrary   — layer blueprints, shaders, frames, backs, timing constants
 ```
 
 ### PackOpening (orchestrator only)
@@ -127,42 +131,116 @@ Collection (collection_view.gd)
 
 # Asset Pipeline
 
+Full reference: [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md)
+
 ```
 assets/
-    cards/          — card artwork PNGs (referenced by CardData.tres)
-    frames/         — rarity/frame PNGs (common, rare, epic, legendary)
-    backs/          — card back PNGs (e.g. default.png)
-    shaders/        — variant FX shaders (foil, diamond, negative)
-    variants/       — reserved for future variant overlay textures
-    glows/          — reserved for future rarity glow textures
-    placeholder/    — dev placeholder slot
+    cards/
+        common/ · rare/ · epic/ · legendary/
+        event/ · developer/
+    frames/         common.png, rare.png, epic.png, legendary.png
+    backs/          default.png
+    variants/       foil/ · gold/ · diamond/ · negative/  (PNG optional)
+    glows/          common/ · rare/ · epic/ · legendary/    (PNG optional)
+    shaders/        procedural variant FX fallback
 ```
 
-**Workflow (no code required)**
+**Loading flow:** `CardData` → `CardRenderer` → `VariantRenderer` + `CardVisualLibrary` → textures / shaders / StyleBox fallbacks.
 
-1. Drop PNGs under `assets/`.
-2. Create or edit `CardData` / `PackConfig` `.tres` under `resources/`.
-3. Launch — autoloads register content on startup.
+**Convention:** `assets/cards/<folder>/<card_id>.png` auto-resolves when `CardData.artwork` is null.
 
-`CardVisualLibrary` is the **only** class responsible for loading visual assets (textures, shaders, StyleBox fallbacks). Missing assets warn once and fall back gracefully.
+`CardVisualLibrary` is the **only** class with `res://assets/...` paths. Missing required assets warn once; optional PNGs fail silently to shader/color fallbacks.
+
+---
+
+---
+
+# Variant Material System
+
+**Status: Production Ready** (Foil validated through Phase 2.5)
+
+| Phase | Scope | Status |
+|-------|-------|--------|
+| 2.1 | Premium Foil material prototype (layer blueprints) | ✓ Complete |
+| 2.2 | Material depth & idle parallax | ✓ Complete |
+| 2.3 | Per-layer quiet tuning | ✓ Complete |
+| 2.4 | Layer cohesion (`material_response`) | ✓ Complete |
+| 2.5 | Final foil polish & validation | ✓ Complete |
+
+### Foil layer stack (artwork → frame)
+
+```
+Artwork
+    ↓
+Micro Grain      (TEXTURE, MUL, depth 0.02)
+    ↓
+Rainbow          (SHADER foil_rainbow, depth 0.08)
+    ↓
+Shine            (SHADER foil_soft_shine, depth 0.15)
+    ↓
+Glitter          (TEXTURE scroll, depth 0.25)
+    ↓
+Sparkles         (TEXTURE pulse, depth 0.35)
+    ↓
+Frame
+```
+
+One global idle driver moves layers by `depth × material_response`. Visual priority: **artwork → frame → foil material**.
+
+### Gold Variant
+
+**Status: Production Ready** (validated through Phase 3.5)
+
+| Phase | Scope | Status |
+|-------|-------|--------|
+| 3.1 | Gold material prototype (stamped metallic stack) | ✓ Complete |
+| 3.2 | Material depth & motion | ✓ Complete |
+| 3.3 | Layer tuning (review-mode visibility) | ✓ Complete |
+| 3.4 | Material cohesion (`material_response`) | ✓ Complete |
+| 3.5 | Final gold polish & validation | ✓ Complete |
+
+```
+Artwork
+    ↓
+Brushed Metal Grain     (TEXTURE, MUL, depth 0.02)
+    ↓
+Warm Metallic Reflection (SHADER gold_warm_reflection, depth 0.07)
+    ↓
+Gold Mirror Shine       (SHADER gold_mirror_shine, depth 0.16)  ← dominant cue
+    ↓
+Metal Flakes            (TEXTURE scroll, depth 0.20)
+    ↓
+Tiny Specular           (TEXTURE pulse, depth 0.24)
+    ↓
+Frame
+```
+
+Gold uses **reflection** (warm champagne/amber/bronze), not foil **diffraction**. Mirror shine is the strongest cue. Depth × `material_response` keeps Gold heavier and slower than Foil.
+
+**Gold is production-ready.** Future work should tune values only — no renderer redesign.
+
+### Frozen renderer architecture
+
+`VariantRenderer`, `VariantLayer`, `CardRenderer`, and `CardVisualLibrary` are considered **stable**. Future variant work should author content through **VariantLayer blueprints** and assets under `assets/variants/` — not redesign the renderer unless a real limitation is discovered.
+
+**Diamond and Negative** still use legacy `LegacyVariantFx` shader paths until migrated.
 
 ---
 
 # Current Variant Support
 
-Variants defined in `CardData.Variant` and rendered via `VariantOverlay` (above frame).
+Variants defined in `CardData.Variant`. Foil uses `RenderLayerContainer`; others use legacy overlay nodes until migrated.
 
 | Variant | Enum | Visual treatment |
 |---------|------|------------------|
 | **Normal** | `NORMAL` | No effects |
-| **Foil** | `FOIL` | Diagonal holographic shader sweep |
-| **Negative** | `NEGATIVE` | Inverted artwork + subtle chromatic edge pulse |
+| **Foil** | `FOIL` | Production layered material (grain, rainbow, shine, glitter, sparkles) |
+| **Negative** | `NEGATIVE` | Inverted artwork + subtle chromatic edge pulse (legacy) |
 | **Alternate Art** | `ALTERNATIVE_ART` | No overlay FX — artwork is the variant |
-| **Diamond** | `DIAMOND` | Cool white/blue crystal glow + point twinkles |
+| **Diamond** | `DIAMOND` | Cool white/blue crystal glow + point twinkles (legacy) |
+| **Gold** | `GOLD` | Production layered material (brushed grain, warm reflection, mirror shine, flakes, specular) |
 
-**Not in codebase:** **Gold** is not present in `CardData.Variant`. Do not assume a Gold variant until the enum and renderer branch exist.
-
-**Future variants:** not planned yet.
+**Future variants:** author via `CardVisualLibrary.VARIANT_LAYER_BLUEPRINTS`, not renderer changes.
 
 ---
 
@@ -203,7 +281,6 @@ Active GitHub issues only ([MerpMB/TCGdemo](https://github.com/MerpMB/TCGdemo)):
 
 | # | Title | Notes |
 |---|-------|-------|
-| **5** | Issue #6 — Production Asset Pipeline | Partially implemented (frames, backs, library); issue still open |
 | **9** | Issue #10 — Content Pipeline | Editorial workflow, content volume, import tooling |
 
 ---
@@ -220,9 +297,12 @@ Active GitHub issues only ([MerpMB/TCGdemo](https://github.com/MerpMB/TCGdemo)):
 | ✓ CardScene Cleanup (module split) | #7 |
 | ✓ Performance Audit (baseline pass) | #8 |
 | ✓ Documentation behind code (F2) | — |
+| ✓ Variant Material System — Foil production stack (Phases 2.1–2.5) | — |
+| ✓ Gold Variant Material — production stack (Phases 3.1–3.5) | — |
 | ✓ Variant Visual Polish (shader FX pass) | #11 (local) |
+| ✓ Production Asset Pipeline | #5 / Issue #6 |
 
-**Also shipped (no open issue):** PackConfig + PackDatabase · pack pool isolation · duplicate stacking · owned badges · card back pipeline · UI module split · mobile portrait layout
+**Also shipped (no open issue):** PackConfig + PackDatabase · pack pool isolation · duplicate stacking · owned badges · card back pipeline · UI module split · mobile portrait layout · `card_id` artwork convention
 
 ---
 
@@ -231,10 +311,10 @@ Active GitHub issues only ([MerpMB/TCGdemo](https://github.com/MerpMB/TCGdemo)):
 Recommended order for next development sessions:
 
 1. **Content Pipeline** — more cards, sets, artwork, pack definitions (Issue #9)
-2. **Production Asset Pipeline close-out** — finalize Issue #5, variant/glow texture folders
-3. **Save System** — implement `SaveManager` persistence (Phase 6)
-4. **Collection Filters** — wire `_apply_view_filters()` in collection gallery
-5. **Pack Selection UI** — expose pack choice on main menu
+2. **Save System** — implement `SaveManager` persistence (Phase 6)
+3. **Collection Filters** — wire `_apply_view_filters()` in collection gallery
+4. **Pack Selection UI** — expose pack choice on main menu
+5. **PNG variant/glow overlays** — optional art drops into `assets/variants/` and `assets/glows/`
 
 ---
 
@@ -246,13 +326,13 @@ Real remaining debt only — not shipped work.
 |------|--------|
 | `SaveManager` is stub-only | Collection resets every session |
 | No pack picker on main menu | Players cannot choose Premium/Event packs in normal flow |
-| `assets/variants/` and `assets/glows/` unused | Procedural shaders used instead of texture overlays |
+| Variant/glow PNG folders empty | Shaders used; drop `overlay.png` / `glow.png` when art is ready |
+| 31 of 44 cards lack artwork | Placeholders use rarity color bodies |
 | Collection filter hook is a pass-through | Search / rarity / variant filters not implemented |
 | `CHANGELOG` still at v0.1.0 | v0.2.0 work unreleased / undocumented in changelog |
 | Deck builder not linked from main menu | Framework feature exists but hidden |
 | CardViewer has no metadata overlays | By design for now; hooks are empty stubs |
 | README screenshots are placeholders | `docs/images/` not populated |
-| Large uncommitted local diff | Architecture refactor + assets + variant shaders not yet on `master` |
 
 ---
 
@@ -265,7 +345,7 @@ Near-term work should emphasize **content**, not architecture rewrites:
 - **Variant** distribution tuning through `variant_weights`
 - **Progression** hooks (save, collection filters, pack shop) built on existing managers
 
-The renderer and module split are considered **stable**. Prefer data-driven additions over new autoloads or scene hierarchy changes.
+The renderer and module split are considered **stable**. Prefer data-driven additions (cards, packs, variant layer blueprints) over new autoloads or scene hierarchy changes.
 
 ---
 
@@ -290,14 +370,14 @@ Approximate completion (framework & showcase, not commercial content depth):
 | Area | Progress | Notes |
 |------|----------|-------|
 | **Foundation** | 95% | Data, managers, generator, autoloads |
-| **Renderer** | 90% | Full-art, frames, backs, variant shaders |
-| **Asset Pipeline** | 85% | Library + folders; variant/glow PNG path unused |
+| **Renderer** | 96% | Full-art, frames, backs, foil + gold production stacks; Diamond/Negative legacy |
+| **Asset Pipeline** | 95% | Full folder tree, convention paths, `ASSET_PIPELINE.md` |
 | **Mobile** | 95% | Portrait, responsive grids, touch-first |
 | **Collection** | 80% | Gallery, stacking, viewer; no filters/save |
 | **Content** | 35% | 44 cards, 4 packs — room to grow |
 | **Polish** | 75% | Pack FX, variant shaders; audio/screenshots thin |
-| **Overall** | **~78%** | Playable loop complete; persistence & content scale remain |
+| **Overall** | **~80%** | Playable loop complete; persistence & content scale remain |
 
 ---
 
-*Related docs: [README.md](README.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/ROADMAP.md](docs/ROADMAP.md) · [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) · [TODO.md](TODO.md)*
+*Related docs: [README.md](README.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md) · [docs/ROADMAP.md](docs/ROADMAP.md) · [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) · [TODO.md](TODO.md)*

@@ -25,8 +25,11 @@ var diamond_glow: ColorRect
 var diamond_icon: ColorRect
 var legendary_spark: ColorRect
 var owned_count_badge: Label
+var render_layer_container: Control
 ## Host Control size (for foil reset). Set by CardScene.
 var host_size := Vector2.ZERO
+
+var _variant_renderer: VariantRenderer = VariantRenderer.new()
 
 
 func bind(
@@ -47,7 +50,8 @@ func bind(
 	p_diamond_glow: ColorRect,
 	p_diamond_icon: ColorRect,
 	p_spark: ColorRect,
-	p_badge: Label
+	p_badge: Label,
+	p_render_layer_container: Control
 ) -> void:
 	art_texture = p_art
 	card_body = p_body
@@ -67,6 +71,8 @@ func bind(
 	diamond_icon = p_diamond_icon
 	legendary_spark = p_spark
 	owned_count_badge = p_badge
+	render_layer_container = p_render_layer_container
+	_variant_renderer.bind(render_layer_container, host_size)
 
 
 func apply(card_data: CardData, back_type: CardVisualLibrary.CardBackType) -> void:
@@ -78,6 +84,12 @@ func apply(card_data: CardData, back_type: CardVisualLibrary.CardBackType) -> vo
 	apply_artwork(card_data)
 	rarity_glow.color = Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.0)
 	configure_variant_overlay(card_data)
+	_variant_renderer.bind(render_layer_container, host_size)
+	_variant_renderer.apply(card_data)
+
+
+func process_variant_idle(delta: float) -> void:
+	_variant_renderer.process_idle(delta)
 
 
 func apply_frame(card_data: CardData) -> void:
@@ -116,8 +128,9 @@ func apply_card_back(card_data: CardData, back_type: CardVisualLibrary.CardBackT
 func apply_artwork(card_data: CardData) -> void:
 	art_texture.material = null
 	art_texture.modulate = Color.WHITE
-	var has_art := card_data.artwork != null
-	art_texture.texture = card_data.artwork
+	var texture := CardVisualLibrary.resolve_artwork(card_data)
+	var has_art := texture != null
+	art_texture.texture = texture
 	art_texture.visible = has_art
 	card_body.visible = not has_art
 	if has_art:
@@ -130,20 +143,15 @@ func configure_variant_overlay(card_data: CardData) -> void:
 	reset_variant_overlays()
 	match card_data.variant:
 		CardData.Variant.FOIL:
-			_apply_foil_overlay()
+			pass
 		CardData.Variant.NEGATIVE:
 			_apply_negative_overlay()
 		CardData.Variant.ALTERNATIVE_ART:
 			pass
 		CardData.Variant.DIAMOND:
 			_apply_diamond_overlay()
-
-
-func _apply_foil_overlay() -> void:
-	CardVisualLibrary.make_foil_overlay_full_rect(foil_shine)
-	foil_shine.material = CardVisualLibrary.create_foil_shine_material()
-	foil_shine.color = Color(1.0, 1.0, 1.0, 1.0)
-	foil_shine.visible = true
+		CardData.Variant.SYNTH:
+			pass
 
 
 func _apply_negative_overlay() -> void:
@@ -171,6 +179,7 @@ func reset_variant_overlays() -> void:
 	negative_overlay.visible = false
 	foil_shine.material = null
 	foil_shine.visible = false
+	alt_art_icon.material = null
 	alt_art_icon.visible = false
 	diamond_glow.material = null
 	diamond_glow.visible = false
@@ -178,6 +187,7 @@ func reset_variant_overlays() -> void:
 	diamond_icon.visible = false
 	legendary_spark.visible = false
 	foil_shine.position.x = -host_size.x
+	_variant_renderer.reset()
 
 
 func show_face_down(pack_reveal_enabled: bool) -> void:

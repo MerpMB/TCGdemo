@@ -45,13 +45,18 @@ docs/               Documentation
 
 ## Adding Content (No Code)
 
-### New card
+Full pipeline reference: [ASSET_PIPELINE.md](ASSET_PIPELINE.md)
 
-1. Drop artwork PNG under `assets/` (e.g. `assets/cards/rare/my-card.png`).
-2. Create `resources/cards/<set>/my_card.tres` as a `CardData` resource:
-   - `card_id`, `display_name`, `rarity`, `card_set`, `tags`
-   - Assign `artwork` texture
-   - Optional: `frame`, `card_back`
+### New card (convention path — recommended)
+
+1. Drop `assets/cards/<folder>/<card_id>.png` (folder = rarity or `event` / `developer` for those sets).
+2. Create `resources/cards/<set>/<card_id>.tres` with matching `card_id`, `rarity`, `card_set`, `tags`.
+3. Launch — artwork resolves via `CardVisualLibrary.resolve_artwork()`; no `artwork` field required.
+
+### New card (explicit artwork)
+
+1. Drop artwork PNG under `assets/cards/`.
+2. Create `CardData.tres` and assign the `artwork` texture in the inspector.
 3. Launch — `CardDatabase` registers it automatically.
 
 ### New pack
@@ -61,9 +66,9 @@ docs/               Documentation
 3. Launch — `PackDatabase` registers it automatically.
 4. Select it via `GameManager.set_selected_pack("my_pack")` or the Developer Panel.
 
-### New frame or card back
+### New frame, card back, variant overlay, or glow
 
-1. Drop PNG into `assets/frames/<key>.png` or `assets/backs/<name>.png`.
+1. Drop PNG into the matching folder (see [ASSET_PIPELINE.md](ASSET_PIPELINE.md)).
 2. No script changes — `CardVisualLibrary` loads on demand with caching and fallbacks.
 
 ---
@@ -140,4 +145,4 @@ PackConfig → CardDatabase.get_cards_for_pack() → PackGenerator → Array[Car
 
 ---
 
-*See also: [ARCHITECTURE.md](ARCHITECTURE.md) · [TODO.md](../TODO.md) · [CONTRIBUTING.md](../CONTRIBUTING.md)*
+*See also: [ARCHITECTURE.md](ARCHITECTURE.md) · [ASSET_PIPELINE.md](ASSET_PIPELINE.md) · [TODO.md](../TODO.md) · [CONTRIBUTING.md](../CONTRIBUTING.md)*

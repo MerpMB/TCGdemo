@@ -12,6 +12,12 @@ static func generate_pack(
 	if pack_config == null:
 		push_warning("PackGenerator: pack_config is null.")
 		return []
+	if pack_config.rarity_weights.is_empty() or pack_config.variant_weights.is_empty():
+		push_warning(
+			"PackGenerator: pack '%s' has empty rarity_weights or variant_weights."
+			% pack_config.pack_id
+		)
+		return []
 
 	var pack: Array[CardData] = []
 	var random := _get_rng(rng)

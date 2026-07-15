@@ -17,6 +17,7 @@ enum Variant {
 	NEGATIVE,
 	ALTERNATIVE_ART,
 	DIAMOND,
+	SYNTH,
 }
 
 
@@ -40,6 +41,7 @@ const VARIANT_LABELS: Dictionary = {
 	Variant.NEGATIVE: "Negative",
 	Variant.ALTERNATIVE_ART: "Alternative Art",
 	Variant.DIAMOND: "Diamond",
+	Variant.SYNTH: "Synth",
 }
 
 
