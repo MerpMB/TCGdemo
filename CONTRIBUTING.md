@@ -5,12 +5,13 @@ Thank you for your interest in contributing. This project is a modular Godot 4 f
 ## Before You Start
 
 1. Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) to understand system boundaries.
-2. Check [docs/ROADMAP.md](docs/ROADMAP.md) for planned work.
-3. Open an issue or discussion for large changes before opening a pull request.
+2. Read [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for local setup and coding rules.
+3. Check [docs/ROADMAP.md](docs/ROADMAP.md) and [TODO.md](TODO.md) for planned work.
+4. Open an issue or discussion for large changes before opening a pull request.
 
 ## Development Setup
 
-1. Install [Godot 4.4+](https://godotengine.org/download).
+1. Install [Godot 4.4+](https://godotengine.org/download) (4.6 recommended).
 2. Clone the repository.
 3. Open `project.godot` in Godot.
 4. Press **F5** to run the project.
@@ -31,12 +32,25 @@ Thank you for your interest in contributing. This project is a modular Godot 4 f
 - **Systems** (`scripts/systems/`) — pure logic with no scene or UI dependencies.
 - **UI** (`scripts/ui/`) — presentation and input; requests data through managers.
 - **Autoloads** (`autoload/`) — global services (managers, databases).
+- **Visual assets** — load only through `CardVisualLibrary`; no paths in `CardScene` or `CardRenderer`.
+- **Pack pools** — filter only in `CardDatabase.get_cards_for_pack()`; `PackGenerator` draws from the returned pool.
+
+### CardScene module boundaries
+
+| Module | May touch |
+|--------|-----------|
+| `card_scene.gd` | Orchestration, mode setup, signals |
+| `card_renderer.gd` | Visual node properties via `CardVisualLibrary` |
+| `card_animation.gd` | Card root motion, FlipPivot scale.x, FX opacity/sweep |
+| `card_interaction.gd` | Gallery input only |
+| `card_layer_guard.gd` | Debug assertions only |
 
 ### Do Not
 
-- Put pack generation logic inside UI scenes.
+- Put pack generation or pool filtering logic inside UI scenes.
 - Let UI mutate `CollectionManager` internal state directly.
 - Hardcode references between unrelated UI scenes — use `GameManager` and signals.
+- Animate protected render layers (`ArtTexture`, `FrameTexture`, etc.) for card motion.
 - Couple the framework to a specific game ruleset (e.g. Blackjack logic).
 
 ## Folder Organization
@@ -44,13 +58,14 @@ Thank you for your interest in contributing. This project is a modular Godot 4 f
 | Path | Purpose |
 |------|---------|
 | `autoload/` | Singleton managers and databases |
-| `scripts/data/` | `CardData` and future data resources |
+| `scripts/data/` | `CardData`, `PackConfig` resources |
 | `scripts/systems/` | `PackGenerator` and future pure logic |
-| `scripts/ui/` | Scene controllers and visual helpers |
+| `scripts/ui/` | Scene controllers and UI helpers |
 | `scenes/` | Godot scene files (`.tscn`) |
-| `resources/` | Future `.tres` card and pack resources |
-| `assets/` | Art, audio, and placeholder media |
-| `docs/` | Architecture and roadmap documentation |
+| `resources/cards/` | `CardData` `.tres` definitions |
+| `resources/packs/` | `PackConfig` `.tres` definitions |
+| `assets/` | Art and visual media |
+| `docs/` | Architecture, roadmap, and development docs |
 
 ## Naming Conventions
 

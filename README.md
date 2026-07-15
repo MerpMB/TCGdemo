@@ -15,32 +15,66 @@ TCG Framework is a standalone, game-agnostic card engine — not a finished game
 
 ## Current Features
 
-- ✅ **Pack Opening** — Full presentation flow with pack animations, card fly-out, rarity effects, and results summary
-- ✅ **Collection** — Scrollable grid of owned cards with hover and click feedback
-- ✅ **Deck Builder** — Split-view collection → deck with 10-card limit
-- ✅ **Card Inspector** — Popup detail view for any owned card
+- ✅ **Mobile-first portrait UI** — 720×1280 with responsive stretch
+- ✅ **Pack Opening** — Full presentation flow: pack animations, card fly-out, tap-to-reveal, skip, legendary flash
+- ✅ **Full-art card renderer** — Artwork fills the card; frame and variant FX as overlays
+- ✅ **Frame & card back assets** — PNG pipeline via `CardVisualLibrary` with procedural fallbacks
+- ✅ **Collection Gallery** — Responsive grid with duplicate stacking and `×N` owned badges
+- ✅ **Card Viewer** — Full-screen card appreciation (art-only, tap-outside close)
+- ✅ **Pack isolation** — `PackConfig` filters pools by set and tags; rarity weights unchanged
+- ✅ **Modular CardScene** — Split into `CardRenderer`, `CardAnimation`, `CardInteraction`, `CardLayerGuard`
+- ✅ **Content pipeline** — Add cards and packs via `.tres` resources; no script edits required
 - ✅ **Developer Panel** — F1 testing tools (give cards, clear collection, generate packs)
+- ✅ **Deck Builder** — Split-view collection → deck with 10-card limit (framework feature)
 - ✅ **Runtime Collection Manager** — In-memory collection and deck with change signals
+
+## Game Loop
+
+```
+Main Menu → Open Pack → Reveal 7 Cards → Cards Added to Collection
+    → Collection Gallery → Card Viewer → Repeat
+```
 
 ## Architecture Overview
 
 | System | Role |
 |--------|------|
-| **CardDatabase** | Catalog of all card definitions — single source of truth |
-| **PackGenerator** | Weighted pack/card generation — pure logic, no UI |
-| **CollectionManager** | Player-owned cards and active deck |
-| **GameManager** | Scene navigation, transitions, global overlays |
+| **CardDatabase** | Catalog of all card definitions — auto-loads `resources/cards/` |
+| **PackDatabase** | Registry of `PackConfig` resources from `resources/packs/` |
+| **PackGenerator** | Weighted pack generation from filtered pools — pure logic, no UI |
+| **CollectionManager** | Player-owned cards (individual copies) and active deck |
+| **GameManager** | Scene navigation, CardViewer overlay, developer panel |
+| **CardVisualLibrary** | Single entry point for frame, back, and variant visual assets |
 | **SaveManager** | Persistence API placeholder for future disk saves |
-| **UI** | Scene controllers that request data and react to signals |
 
 ```
-CardDatabase  ◄──  PackGenerator
-      ▲
-      │
+CardDatabase  ◄──  PackGenerator  ◄──  PackConfig
+      ▲                                    ▲
+      │                              PackDatabase
 CollectionManager  ◄──  UI Scenes
       ▲
       │
  SaveManager (placeholder)
+```
+
+### CardScene modules
+
+```
+CardScene
+    ├── CardRenderer
+    ├── CardAnimation
+    ├── CardInteraction
+    ├── CardLayerGuard
+    └── CardVisualLibrary
+```
+
+### PackOpening modules
+
+```
+PackOpening
+    ├── PackLayout
+    ├── PackAnimation
+    └── CardScene
 ```
 
 For full details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -51,18 +85,25 @@ For full details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 TCGdemo/
 ├── autoload/                  # Singleton managers
 │   ├── card_database.gd
+│   ├── pack_database.gd
 │   ├── collection_manager.gd
 │   ├── game_manager.gd
 │   └── save_manager.gd
 ├── assets/
-│   └── placeholder/           # Frames, backs, future art
+│   ├── cards/                 # Card artwork PNGs
+│   ├── frames/                # Rarity frame PNGs
+│   ├── backs/                 # Card back PNGs
+│   ├── variants/              # Future variant overlay textures
+│   ├── glows/                 # Future glow textures
+│   └── placeholder/
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── ROADMAP.md
-│   └── images/                # Screenshots (add your own)
+│   ├── DEVELOPMENT.md
+│   └── images/
 ├── resources/
-│   ├── cards/                 # Future .tres card resources
-│   └── packs/                 # Future .tres pack configs
+│   ├── cards/                 # CardData .tres (auto-scanned)
+│   └── packs/                 # PackConfig .tres (auto-scanned)
 ├── scenes/
 │   ├── Card.tscn
 │   ├── CardViewer.tscn
@@ -75,23 +116,31 @@ TCGdemo/
 │   └── Settings.tscn
 ├── scripts/
 │   ├── data/
-│   │   └── card_data.gd
+│   │   ├── card_data.gd
+│   │   └── pack_config.gd
 │   ├── systems/
 │   │   └── pack_generator.gd
 │   └── ui/
-│       ├── card_scene.gd
-│       ├── card_viewer.gd
+│       ├── card_scene.gd          # Orchestrator
+│       ├── card_renderer.gd
+│       ├── card_animation.gd
+│       ├── card_interaction.gd
+│       ├── card_layer_guard.gd
 │       ├── card_visual_library.gd
+│       ├── card_viewer.gd
 │       ├── collection_view.gd
+│       ├── pack_opening.gd        # Orchestrator
+│       ├── pack_layout.gd
+│       ├── pack_animation.gd
+│       ├── pack_scene.gd
 │       ├── deck_builder.gd
 │       ├── developer_panel.gd
 │       ├── main_menu.gd
 │       ├── menu_button.gd
-│       ├── pack_opening.gd
-│       ├── pack_scene.gd
 │       └── settings_view.gd
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
+├── TODO.md
 ├── LICENSE
 ├── project.godot
 └── icon.svg
@@ -105,9 +154,9 @@ TCGdemo/
 |-----------|--------------|
 | ![Main Menu](docs/images/main_menu.png) | ![Pack Opening](docs/images/pack_opening.png) |
 
-| Collection | Deck Builder |
-|------------|--------------|
-| ![Collection](docs/images/collection.png) | ![Deck Builder](docs/images/deck_builder.png) |
+| Collection | Card Viewer |
+|------------|-------------|
+| ![Collection](docs/images/collection.png) | ![Card Viewer](docs/images/card_viewer.png) |
 
 *Placeholder paths — capture screenshots from the running project and save them to `docs/images/`.*
 
@@ -115,89 +164,99 @@ TCGdemo/
 
 ### Requirements
 
-- [Godot 4.4+](https://godotengine.org/download) (project tested with 4.6)
+- [Godot 4.4+](https://godotengine.org/download) (project tested with **4.6**)
 
 ### How to Run
 
 ```bash
-git clone https://github.com/admiralshiboo/TCGdemo.git
+git clone https://github.com/MerpMB/TCGdemo.git
 cd TCGdemo
 ```
 
 1. Open `project.godot` in Godot.
 2. Press **F5** (or click Play).
-3. Use the main menu to open packs, browse your collection, and build a deck.
-4. Press **F1** at any time to open the Developer Panel.
+3. Use the main menu to open packs and browse your collection.
+4. Tap a card in the gallery to open the Card Viewer.
+5. Press **F1** at any time to open the Developer Panel.
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full development guide.
 
 ## Content Pipeline (No Code Required)
 
-`CardScene` is a full-art renderer: every per-card visual (artwork, frame,
-variant effect, card back) resolves from the `CardData` resource. `CardDatabase`
-recursively auto-scans `res://resources/cards/` on startup, so **adding a card
-never requires editing scripts.**
+`CardDatabase` recursively auto-scans `res://resources/cards/` on startup.
+`PackDatabase` loads all `PackConfig` files from `res://resources/packs/`.
+**Adding a card or pack never requires editing scripts.**
+
+### Asset folders
+
+```
+assets/
+    cards/          — card artwork (referenced by CardData.tres)
+    frames/         — frame PNGs keyed by rarity or CardData.frame
+    backs/          — card back PNGs (default.png, etc.)
+    variants/       — future variant overlay textures
+    glows/          — future rarity glow textures
+```
+
+`CardVisualLibrary` is the **single entry point** for loading visual assets.
+`CardScene` and `CardRenderer` contain no asset paths.
 
 ### Add a new card
 
-1. **Drop the artwork** PNG anywhere under `res://assets/` (e.g. `assets/cards/rare/`).
-   Godot imports it automatically on focus.
-2. **Create a `CardData` resource** (`.tres`) under `res://resources/cards/`:
-   - Set `card_id` (unique), `display_name`, `rarity`, and `variant`.
-   - Assign the imported texture to the `artwork` field.
-   - Optionally set `frame` (a frame key) and `card_back`.
-3. **Launch the game.** The card is registered automatically and renders full-bleed.
+1. Drop artwork PNG under `assets/` (e.g. `assets/cards/rare/my-card.png`).
+2. Create a `CardData` `.tres` under `resources/cards/`:
+   - Set `card_id`, `display_name`, `rarity`, `card_set`, and optional `tags`.
+   - Assign the imported texture to `artwork`.
+   - Optionally set `frame` and `card_back`.
+3. Launch the game — the card registers and renders full-bleed automatically.
 
-Rendering layer order (bottom → top): **artwork → frame → variant effect → FX**.
-The artwork always fills the card and sits underneath the frame border.
+### Add a new pack
 
-### Frame art (optional)
+1. Create a `PackConfig` `.tres` under `resources/packs/`.
+2. Set weights and pool filters (`allowed_sets`, `allowed_tags`, `excluded_tags`).
+3. Launch — the pack is available via `PackDatabase` and the Developer Panel.
 
-The frame is procedural by default. To use image frames, drop PNGs named by
-frame key into `res://assets/frames/`:
+### Rendering order (front face)
 
 ```
-assets/frames/common.png
-assets/frames/rare.png
-assets/frames/epic.png
-assets/frames/legendary.png
+ArtTexture → FrameTexture → VariantOverlay → LegendarySpark → Interaction
 ```
 
-The renderer loads `assets/frames/<key>.png` automatically (key comes from
-`CardData.frame`, falling back to the rarity name). If a PNG is missing, the
-procedural rarity border is used instead — the card always renders.
+Frame PNGs live in `assets/frames/<key>.png`. Missing frames fall back to a procedural `StyleBoxFlat` border — cards always render.
 
-### Remaining manual steps
+### Pack generation pipeline
 
-- Artwork/frame PNGs must be imported by the Godot editor once (automatic on
-  focus, or run a headless `--import`). `.import` metadata is git-ignored by design.
-- To make a card obtainable in-game, include it in a pack config or grant it via
-  the Developer Panel — the card exists in the database either way.
+```
+PackConfig → CardDatabase.get_cards_for_pack() → filtered pool → PackGenerator → pack
+```
+
+Rarity and variant weights are unchanged. Packs are isolated by `allowed_sets` and tags.
+
+### Collection behavior
+
+- Every owned copy is stored individually in `CollectionManager` with a unique `instance_id`.
+- The gallery stacks exact duplicates (`card_id` + `variant`) for display only.
+- The `×N` badge shows owned count. Different variants remain separate entries.
 
 ## Roadmap
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| Phase 1 | ✅ | Framework foundation (data, generator, basic UI) |
-| Phase 2 | ✅ | Playable prototype (menu, collection, deck builder) |
-| Phase 3 | ✅ | Pack presentation polish |
-| Phase 4 | Upcoming | Card Resource Pipeline |
-| — | Planned | PackConfig, Save System, Collection Persistence |
+| Phase 1–3 | ✅ | Framework, prototype, pack presentation |
+| Phase 4–5 | ✅ | Card resources, PackConfig, visual systems, collection UX |
+| Phase 6 | Upcoming | Save System |
+| Phase 7 | Upcoming | Shop |
+| Phase 8 | Upcoming | Game Integrations |
 
-See the full [Roadmap](docs/ROADMAP.md) for Phases 5–8 and future goals.
-
-### Future Goals
-
-- Shop and economy layer
-- Crafting and duplicate handling
-- Trading and multiplayer
-- **Game integrations** — Blackjack, Poker, and future card games
+See the full [Roadmap](docs/ROADMAP.md) for completed features and upcoming work.
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) before opening a pull request.
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for version history. Current release: **v0.1.0**.
+See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ## License
 
