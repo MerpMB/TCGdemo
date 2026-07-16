@@ -183,6 +183,16 @@ BackPanel           — StyleBox fallback when texture is missing
 
 `CardVisualLibrary` is the **single entry point** for loading card visual assets. `CardScene` and `CardRenderer` never contain asset paths.
 
+Variant FX are split into sibling modules behind the facade:
+
+| Module | Owns |
+|--------|------|
+| `FoilMaterials` | Foil tuning, blueprints, shaders, procedural grain/glitter |
+| `SynthMaterials` | Synth tuning, blueprints, shaders (+ `SynthTopology` bake) |
+| `DiamondMaterials` | Diamond tuning, blueprints, shaders |
+| `NegativeMaterials` | Negative tuning, blueprints, invert/edge shaders |
+| `VariantShaderCache` | Shared `res://assets/shaders` load/cache |
+
 ```
 assets/
     cards/          — card artwork PNGs (referenced by CardData.tres)
@@ -256,6 +266,7 @@ Array[CardData] pack contents
 - Global `CardViewer` overlay (`show_card_viewer()`)
 - Developer panel toggle (F1)
 - Selected pack ID for pack opening
+- Startup visual warmup (`CardVisualLibrary.warmup` + offscreen GPU shader compile) so pack opening does not hitch on first Foil / Diamond / Synth
 
 ### CardDatabase
 

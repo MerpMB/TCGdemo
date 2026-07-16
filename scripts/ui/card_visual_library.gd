@@ -1,11 +1,15 @@
 class_name CardVisualLibrary
 extends RefCounted
-## VisualLibrary — centralized renderer asset pipeline for cards.
-## CardScene / CardRenderer request assets here — they never contain asset paths.
-## Missing textures return null (or StyleBox fallbacks) so cards always render.
+## VisualLibrary facade — asset paths, frame/back/art loading, and variant entry points.
+## Variant FX live in FoilMaterials / SynthMaterials / DiamondMaterials / NegativeMaterials.
+## UI scripts call this class only — they never hardcode res://assets/... paths.
 
 const _VariantLayer := preload("res://scripts/ui/variant_layer.gd")
-const _SynthTopology := preload("res://scripts/ui/synth_topology.gd")
+const _FoilMaterials := preload("res://scripts/ui/foil_materials.gd")
+const _SynthMaterials := preload("res://scripts/ui/synth_materials.gd")
+const _DiamondMaterials := preload("res://scripts/ui/diamond_materials.gd")
+const _NegativeMaterials := preload("res://scripts/ui/negative_materials.gd")
+const _VariantShaderCache := preload("res://scripts/ui/variant_shader_cache.gd")
 
 
 enum CardBackType {
@@ -78,290 +82,16 @@ const IDLE_SPEED := 0.065
 ## Easing curve for idle path segments (1 = linear, 2+ = softer corners).
 const IDLE_CURVE := 2.0
 
-# ---------------------------------------------------------------------------
-# Foil material tuning (production) — one laminated sheet.
-# Layer order: grain → rainbow → shine → glitter → sparkles.
-# Artwork first; foil supports art. Shared idle driver × depth × material_response.
-# Look target: Pokémon SR / Full Art holofoil — diagonal beams, prism sweep, etch.
-# ---------------------------------------------------------------------------
-
-## 1. Micro Grain — film grain (isotropic speckles); almost locked to artwork.
-const FOIL_GRAIN_OPACITY := 0.05
-const FOIL_GRAIN_NOISE_SCALE := 1.15
-const FOIL_GRAIN_CONTRAST := 1.55
-
-## 2. Rainbow — sparse ~40° diagonal beams (BL→TR); gaps clear for art.
-const FOIL_STRENGTH := 0.48
-const FOIL_RAINBOW_STRENGTH := 0.50
-const FOIL_EDGE_FRESNEL := 0.13
-const FOIL_RAINBOW_TIME_SCALE := 0.04
-const FOIL_NOISE_SCALE := 28.0
-const FOIL_BEAM_COUNT := 3.2
-const FOIL_ETCH_DENSITY := 48.0
-const FOIL_RADIAL_STRENGTH := 0.24
-## Across-stripe weights for ~40° lines (bottom-left → top-right).
-const FOIL_BEAM_ANGLE := Vector2(0.78, -0.62)
-
-## 3. Shine — same diagonal as beams; stronger specular catch.
-const FOIL_SHINE_OPACITY := 0.34
-const FOIL_SHINE_SPEED := 8.0
-const FOIL_SHINE_WIDTH := 0.24
-const FOIL_SHINE_FALLOFF := 0.14
-const FOIL_SHINE_ANGLE := Vector2(0.78, -0.62)
-const FOIL_SHINE_PRISM := 0.95
-
-## 4. Glitter — sparse metallic dust.
-const FOIL_GLITTER_OPACITY := 0.065
-const FOIL_GLITTER_DENSITY := 0.968
-const FOIL_GLITTER_DRIFT_SPEED := 0.35
-const FOIL_GLITTER_SCALE := 1.12
-const FOIL_GLITTER_BRIGHTNESS := 0.42
-
-## 5. Sparkles — rare flecks (low material_response).
-const FOIL_SPARKLE_OPACITY := 0.05
-const FOIL_SPARKLE_DENSITY := 0.985
-const FOIL_SPARKLE_PULSE_SPEED := 0.30
-const FOIL_SPARKLE_SIZE := 0.92
-const FOIL_SPARKLE_BRIGHTNESS := 0.44
-
-# ---------------------------------------------------------------------------
-# Synth V2 — premium PCB architecture + fiber traffic.
-# Topology baked by SynthTopology (static). Packets only animate along journeys.
-# Layer order: micro etch → pcb board → fiber traffic → fiber deep → pads.
-# Artwork-first; iridescence on packets only.
-# ---------------------------------------------------------------------------
-
-const SYNTH_MASTER_TIME_SCALE := 1.0
-
-## 1. Micro Circuit Texture — faint PCB etch (MUL).
-const SYNTH_MICRO_CIRCUIT_STRENGTH := 0.024
-const SYNTH_MICRO_CIRCUIT_FREQUENCY := 2.4
-
-## 2. PCB Board — baked idle architecture (beautiful with animation off).
-const SYNTH_TRACE_STRENGTH := 0.11
-const SYNTH_TRACE_EDGE_GLOW := 0.008
-const SYNTH_JUNCTION_BOOST := 0.95
-const SYNTH_FIBER_HALO := 0.70
-
-## 3. Primary fiber traffic — thin pulses run edge→center on many journeys.
-const SYNTH_STREAM_STRENGTH := 1.05
-const SYNTH_STREAM_TIME_SCALE := 0.52
-const SYNTH_PACKET_SPEED := 0.92
-const SYNTH_PACKET_SIZE := 0.055
-const SYNTH_BODY_LENGTH := 0.55
-const SYNTH_TRAIL_LENGTH := 0.72
-const SYNTH_SYNAPSE_STRENGTH := 0.95
-const SYNTH_RAINBOW_STRENGTH := 0.88
-const SYNTH_BLOOM_STRENGTH := 0.58
-
-## 4. Deep fiber — rarer alternate journeys + memorable flashes.
-const SYNTH_TRAIL_STRENGTH := 0.48
-const SYNTH_TRAIL_TIME_SCALE := 0.28
-const SYNTH_TRAIL_PACKET_SPEED := 0.55
-const SYNTH_TRAIL_PACKET_SIZE := 0.06
-const SYNTH_TRAIL_BODY_LENGTH := 0.60
-const SYNTH_TRAIL_LENGTH_SECONDARY := 0.78
-const SYNTH_TRAIL_SYNAPSE_STRENGTH := 0.75
-const SYNTH_TRAIL_RAINBOW_STRENGTH := 0.82
-const SYNTH_TRAIL_BLOOM_STRENGTH := 0.45
-
-## 5. Junction pads — baked vias from topology (ADD, slow pulse).
-const SYNTH_NODE_OPACITY := 0.055
-const SYNTH_NODE_PULSE_SPEED := 0.05
-const SYNTH_NODE_SIZE := 1.0
-
-## Per-variant layer blueprints — renderer consumes materialized VariantLayer instances only.
-## Layer type keys: texture, shader, color, particles
-## Animation keys: static, scroll, rotate, pulse, shimmer
-## Foil uses procedural textures / shaders via "procedural" / "shader_key" (no PNG required).
-const VARIANT_LAYER_BLUEPRINTS := {
-	CardData.Variant.FOIL: [
-		{
-			"id": "micro_grain",
-			"type": "texture",
-			"procedural": "foil_grain",
-			"animation": "static",
-			"z_order": 0,
-			"depth": 0.02,
-			"material_response": 0.5,
-			"opacity": 1.0,
-			"blend_mode": "mul",
-		},
-		{
-			"id": "foil_rainbow",
-			"type": "shader",
-			"shader_key": "foil_rainbow",
-			"animation": "static",
-			"z_order": 10,
-			"depth": 0.08,
-			"material_response": 0.9,
-			"opacity": 1.0,
-		},
-		{
-			"id": "large_shine",
-			"type": "shader",
-			"shader_key": "foil_soft_shine",
-			"animation": "static",
-			"z_order": 20,
-			"depth": 0.15,
-			"material_response": 1.0,
-			"opacity": 1.0,
-		},
-		{
-			"id": "fine_glitter",
-			"type": "texture",
-			"procedural": "foil_glitter",
-			"animation": "scroll",
-			"z_order": 30,
-			"depth": 0.25,
-			"material_response": 0.85,
-			"opacity": FOIL_GLITTER_OPACITY,
-			"blend_mode": "add",
-			"scroll_speed": FOIL_GLITTER_DRIFT_SPEED,
-			"scroll_direction": FOIL_SHINE_ANGLE,
-			"uv_scale": Vector2(FOIL_GLITTER_SCALE, FOIL_GLITTER_SCALE),
-		},
-		{
-			"id": "tiny_sparkle",
-			"type": "texture",
-			"procedural": "foil_sparkle",
-			"animation": "pulse",
-			"z_order": 40,
-			"depth": 0.35,
-			"material_response": 0.55,
-			"opacity": FOIL_SPARKLE_OPACITY,
-			"blend_mode": "add",
-			"pulse_speed": FOIL_SPARKLE_PULSE_SPEED,
-			"uv_scale": Vector2(FOIL_SPARKLE_SIZE, FOIL_SPARKLE_SIZE),
-		},
-	],
-	CardData.Variant.SYNTH: [
-		{
-			"id": "micro_circuit_texture",
-			"type": "texture",
-			"procedural": "synth_micro_circuit",
-			"animation": "static",
-			"z_order": 0,
-			"depth": 0.02,
-			"material_response": 0.35,
-			"opacity": 1.0,
-			"blend_mode": "mul",
-		},
-		{
-			"id": "pcb_board",
-			"type": "shader",
-			"shader_key": "synth_pcb_board",
-			"animation": "static",
-			"z_order": 10,
-			"depth": 0.06,
-			"material_response": 0.65,
-			"opacity": 1.0,
-		},
-		{
-			"id": "fiber_traffic",
-			"type": "shader",
-			"shader_key": "synth_fiber_traffic",
-			"animation": "static",
-			"z_order": 20,
-			"depth": 0.12,
-			"material_response": 0.85,
-			"opacity": 1.0,
-		},
-		{
-			"id": "fiber_deep",
-			"type": "shader",
-			"shader_key": "synth_fiber_deep",
-			"animation": "static",
-			"z_order": 30,
-			"depth": 0.18,
-			"material_response": 1.0,
-			"opacity": 1.0,
-		},
-		{
-			"id": "junction_pads",
-			"type": "texture",
-			"procedural": "synth_junction_pads",
-			"animation": "pulse",
-			"z_order": 40,
-			"depth": 0.22,
-			"material_response": 0.4,
-			"opacity": SYNTH_NODE_OPACITY,
-			"blend_mode": "add",
-			"pulse_speed": SYNTH_NODE_PULSE_SPEED,
-			"uv_scale": Vector2(SYNTH_NODE_SIZE, SYNTH_NODE_SIZE),
-		},
-	],
-	CardData.Variant.DIAMOND: [
-		{
-			"id": "crystal_plate",
-			"type": "shader",
-			"shader_key": "diamond_facets",
-			"animation": "static",
-			"z_order": 0,
-			"depth": 0.05,
-			"material_response": 0.60,
-			"opacity": 1.0,
-		},
-		{
-			"id": "facet_specular",
-			"type": "shader",
-			"shader_key": "diamond_reflection",
-			"animation": "static",
-			"z_order": 10,
-			"depth": 0.12,
-			"material_response": 0.90,
-			"opacity": 1.0,
-		},
-		{
-			"id": "dispersion_peaks",
-			"type": "shader",
-			"shader_key": "diamond_dispersion",
-			"animation": "static",
-			"z_order": 20,
-			"depth": 0.16,
-			"material_response": 0.70,
-			"opacity": 1.0,
-		},
-		{
-			"id": "optical_sparkle",
-			"type": "shader",
-			"shader_key": "diamond_sparkle",
-			"animation": "static",
-			"z_order": 30,
-			"depth": 0.22,
-			"material_response": 0.40,
-			"opacity": 1.0,
-		},
-	],
-	CardData.Variant.NEGATIVE: [
-		{
-			"id": "invert",
-			"type": "texture",
-			"slot": "overlay",
-			"animation": "static",
-			"z_order": 0,
-			"parallax_strength": VARIANT_PARALLAX_OVERLAY,
-		},
-		{
-			"id": "scanline",
-			"type": "texture",
-			"slot": "scanline",
-			"animation": "scroll",
-			"z_order": 10,
-			"scroll_speed": 0.0,
-			"scroll_direction": Vector2(0.0, 1.0),
-		},
-		{
-			"id": "distortion",
-			"type": "texture",
-			"slot": "distortion",
-			"animation": "pulse",
-			"z_order": 20,
-			"opacity": 0.5,
-			"pulse_speed": 3.0,
-		},
-	],
-}
+## Per-variant layer blueprints — aggregated from Foil/Synth/Diamond/Negative modules.
+## Renderer consumes materialized VariantLayer instances only.
+static var VARIANT_LAYER_BLUEPRINTS: Dictionary:
+	get:
+		return {
+			CardData.Variant.FOIL: _FoilMaterials.get_blueprints(),
+			CardData.Variant.SYNTH: _SynthMaterials.get_blueprints(),
+			CardData.Variant.DIAMOND: _DiamondMaterials.get_blueprints(),
+			CardData.Variant.NEGATIVE: _NegativeMaterials.get_blueprints(),
+		}
 
 ## Texture caches (null misses included) so grid/gallery never hits disk twice.
 static var _frame_texture_cache: Dictionary = {}
@@ -369,7 +99,8 @@ static var _artwork_texture_cache: Dictionary = {}
 static var _variant_texture_cache: Dictionary = {}
 static var _card_back_texture_cache: Dictionary = {}
 static var _glow_texture_cache: Dictionary = {}
-static var _variant_shader_cache: Dictionary = {}
+## True after warmup() has filled caches (shaders, procedural maps, frames, art).
+static var _warmup_complete := false
 
 ## One warning per missing key per session.
 static var _missing_frame_warned: Dictionary = {}
@@ -439,6 +170,15 @@ static func get_art_folder_for_card(card: CardData) -> String:
 ## Build the conventional artwork path for documentation / tooling (no load).
 static func get_artwork_path(card_id: String, folder: String) -> String:
 	return "%s/%s/%s.png" % [CARDS_ROOT, folder, card_id.to_lower()]
+
+
+## Resolve frame folder key from CardData.frame or rarity — presentation only.
+static func resolve_frame_key(card: CardData) -> String:
+	if card == null:
+		return "common"
+	if not card.frame.is_empty():
+		return card.frame.to_lower()
+	return FRAME_KEYS.get(card.rarity, "common")
 
 
 ## PNG frame by rarity or frame key string (e.g. "common", "rare").
@@ -548,55 +288,117 @@ static func get_glow_texture(rarity_name: String) -> Texture2D:
 	return get_glow_texture_for_rarity(_parse_rarity_name(rarity_name))
 
 
-## Warn once per card when an explicit artwork reference fails validation.
+## Optional / dev-only asset check. Not called during CardDatabase registration.
+## Placeholder cards with null artwork are valid — convention path resolves at render time.
 static func validate_card_assets(card: CardData) -> void:
 	if card == null or card.card_id.is_empty():
 		return
 	if card.artwork != null:
 		return
-	# Placeholder cards with null artwork are valid — convention path resolves at render time.
 
 
-## Variant FX tuning — shader uniforms; idle motion uses TIME (no per-card tweens).
-# ---------------------------------------------------------------------------
-# Diamond V1 — 7th Edition confetti / starfoil laminate (MTG diamond foil ref).
-# Dense irregular flakes; cyan→magenta wash; boundaries from color/value only.
-# Hierarchy: confetti film → lit flake boost → chroma peaks → star glints.
-# ---------------------------------------------------------------------------
+## Whether startup warmup has already filled visual caches.
+static func is_warmup_complete() -> bool:
+	return _warmup_complete
 
-## Optical richness (jewelry-display lighting) — hotspots only, calm body.
-const DIAMOND_PLATE_STRENGTH := 0.42
-const DIAMOND_FRESNEL_STRENGTH := 0.08
-const DIAMOND_CLARITY_VEIL := 0.0
-const DIAMOND_SEAM_STRENGTH := 0.0
-const DIAMOND_PLATE_IRIDESCENCE := 0.92
 
-const DIAMOND_REFLECTION_STRENGTH := 0.88
-const DIAMOND_BODY_STRENGTH := 0.28
-const DIAMOND_RIM_STRENGTH := 0.06
-const DIAMOND_SPECULAR_IRIDESCENCE := 1.0
-const DIAMOND_SPECULAR_WHITE := 1.15
-const DIAMOND_FIRE_STRENGTH := 0.55
-const DIAMOND_LIGHT_DIR := Vector2(0.35, -0.75)
-const DIAMOND_LIGHT_TIME_SCALE := 0.04
+## Load shaders, procedural textures, Synth topology, frames, backs, glows, and
+## catalog artwork at game start so pack opening does not hitch on first use.
+## Pass CardDatabase (or any node with get_all_cards()) to prefetch card art.
+## Returns ShaderMaterials the caller should draw once to force GPU compile.
+static func warmup(catalog: Node = null) -> Array[ShaderMaterial]:
+	if _warmup_complete:
+		return _build_warmup_materials()
 
-const DIAMOND_WARP_STRENGTH := 0.0
-const DIAMOND_CLARITY := 1.0
-const DIAMOND_COOL_LIFT := 0.0
-const DIAMOND_EDGE_SHARPEN := 0.0
+	var started_msec := Time.get_ticks_msec()
 
-const DIAMOND_DISPERSION_STRENGTH := 0.72
-const DIAMOND_DISPERSION_PEAK_GATE := 0.48
-const DIAMOND_DISPERSION_SATURATION := 1.35
-const DIAMOND_DISPERSION_TIME_SCALE := 0.035
+	_warmup_frames_and_backs()
+	_warmup_glows()
+	_warmup_procedural_textures()
+	_warmup_synth_topology()
+	var materials := _build_warmup_materials()
+	_warmup_variant_layer_stacks()
+	if catalog != null and catalog.has_method("get_all_cards"):
+		_warmup_catalog_artwork(catalog)
 
-const DIAMOND_SPARKLE_STRENGTH := 0.42
-const DIAMOND_SPARKLE_TIME_SCALE := 0.22
-const DIAMOND_SPARKLE_SIZE := 0.007
+	_warmup_complete = true
+	var elapsed := Time.get_ticks_msec() - started_msec
+	print(
+		"CardVisualLibrary: warmup complete in %d ms (%d shaders cached, %d compile materials)."
+		% [elapsed, _VariantShaderCache.cached_count(), materials.size()]
+	)
+	return materials
 
-const NEGATIVE_TIME_SCALE := 0.28
-const NEGATIVE_EDGE_STRENGTH := 0.14
-const NEGATIVE_ART_BRIGHTNESS := 1.0
+
+static func _warmup_frames_and_backs() -> void:
+	for rarity in FRAME_KEYS.keys():
+		get_frame_texture(FRAME_KEYS[rarity])
+	## Only the default back is guaranteed; named backs load on demand.
+	get_card_back_texture(DEFAULT_CARD_BACK)
+
+
+static func _warmup_glows() -> void:
+	for rarity in FRAME_KEYS.keys():
+		get_glow_texture_for_rarity(rarity)
+
+
+static func _warmup_procedural_textures() -> void:
+	for procedural_key in [
+		"foil_grain",
+		"foil_glitter",
+		"foil_sparkle",
+		"synth_micro_circuit",
+		"synth_junction_pads",
+	]:
+		_get_procedural_variant_texture(procedural_key)
+
+
+static func _warmup_synth_topology() -> void:
+	## Forces the 512×720 board/flow/pads bake once at startup.
+	_SynthMaterials.warmup_topology()
+
+
+static func _build_warmup_materials() -> Array[ShaderMaterial]:
+	## Create one configured material per production shader so GPU compile can run offscreen.
+	var materials: Array[ShaderMaterial] = []
+	var candidates: Array = [
+		create_foil_rainbow_material(),
+		create_foil_soft_shine_material(),
+		create_synth_pcb_board_material(),
+		create_synth_fiber_traffic_material(),
+		create_synth_fiber_deep_material(),
+		create_diamond_facets_material(),
+		create_diamond_reflection_material(),
+		create_diamond_refraction_material(),
+		create_diamond_dispersion_material(),
+		create_diamond_sparkle_material(),
+		create_negative_invert_material(),
+		create_negative_edge_material(),
+	]
+	for material in candidates:
+		if material is ShaderMaterial:
+			materials.append(material as ShaderMaterial)
+	return materials
+
+
+static func _warmup_variant_layer_stacks() -> void:
+	## Only variants whose layers are shader/procedural-backed (no missing-PNG spam).
+	for variant in [
+		CardData.Variant.FOIL,
+		CardData.Variant.DIAMOND,
+		CardData.Variant.SYNTH,
+	]:
+		get_variant_layers(variant)
+
+
+static func _warmup_catalog_artwork(catalog: Node) -> void:
+	var cards: Array = catalog.get_all_cards()
+	for card in cards:
+		if card is CardData:
+			resolve_artwork(card as CardData)
+
+
+## Variant FX — factories live in Foil/Synth/Diamond/Negative modules; CVL is the facade.
 
 
 ## Card-back art under assets/backs/<name>.png.
@@ -629,109 +431,31 @@ static func get_card_back_texture(name: String) -> Texture2D:
 
 
 # ---------------------------------------------------------------------------
-# Variant shader materials (procedural FX fallback when PNG overlays are absent)
+# Variant shader materials — facade over Foil/Synth/Diamond/Negative modules
 # ---------------------------------------------------------------------------
 
 static func create_variant_material(shader_name: String) -> ShaderMaterial:
-	var cache_key := shader_name
-	if _variant_shader_cache.has(cache_key):
-		var cached: Shader = _variant_shader_cache[cache_key]
-		var material := ShaderMaterial.new()
-		material.shader = cached
-		return material
-
-	var path := "%s/%s.gdshader" % [SHADERS_ROOT, shader_name]
-	if not ResourceLoader.exists(path):
-		push_warning("CardVisualLibrary: variant shader missing '%s'." % path)
-		return null
-
-	var shader := load(path) as Shader
-	_variant_shader_cache[cache_key] = shader
-	var material := ShaderMaterial.new()
-	material.shader = shader
-	return material
+	return _VariantShaderCache.create(shader_name)
 
 
 static func create_foil_rainbow_material() -> ShaderMaterial:
-	var material := create_variant_material("foil_rainbow")
-	if material:
-		material.set_shader_parameter("rainbow_strength", FOIL_RAINBOW_STRENGTH)
-		material.set_shader_parameter("foil_strength", FOIL_STRENGTH)
-		material.set_shader_parameter("edge_fresnel", FOIL_EDGE_FRESNEL)
-		material.set_shader_parameter("time_scale", FOIL_RAINBOW_TIME_SCALE)
-		material.set_shader_parameter("noise_scale", FOIL_NOISE_SCALE)
-		material.set_shader_parameter("beam_count", FOIL_BEAM_COUNT)
-		material.set_shader_parameter("etch_density", FOIL_ETCH_DENSITY)
-		material.set_shader_parameter("radial_strength", FOIL_RADIAL_STRENGTH)
-		material.set_shader_parameter("beam_angle", FOIL_BEAM_ANGLE)
-	return material
+	return _FoilMaterials.create_rainbow_material()
 
 
 static func create_foil_soft_shine_material() -> ShaderMaterial:
-	var material := create_variant_material("foil_soft_shine")
-	if material:
-		material.set_shader_parameter("shine_opacity", FOIL_SHINE_OPACITY)
-		material.set_shader_parameter(
-			"time_scale",
-			clampf(FOIL_SHINE_SPEED * 0.0023, 0.01, 0.06)
-		)
-		material.set_shader_parameter("band_width", FOIL_SHINE_WIDTH)
-		material.set_shader_parameter("softness", FOIL_SHINE_FALLOFF)
-		material.set_shader_parameter("angle_weights", FOIL_SHINE_ANGLE)
-		material.set_shader_parameter("etch_density", FOIL_ETCH_DENSITY * 0.75)
-		material.set_shader_parameter("prism_strength", FOIL_SHINE_PRISM)
-	return material
+	return _FoilMaterials.create_soft_shine_material()
 
 
 static func create_synth_pcb_board_material() -> ShaderMaterial:
-	var material := create_variant_material("synth_pcb_board")
-	if material:
-		material.set_shader_parameter("board_map", _SynthTopology.get_board_texture())
-		material.set_shader_parameter("trace_strength", SYNTH_TRACE_STRENGTH)
-		material.set_shader_parameter("edge_glow", SYNTH_TRACE_EDGE_GLOW)
-		material.set_shader_parameter("junction_boost", SYNTH_JUNCTION_BOOST)
-		material.set_shader_parameter("fiber_halo", SYNTH_FIBER_HALO)
-	return material
+	return _SynthMaterials.create_pcb_board_material()
 
 
 static func create_synth_fiber_traffic_material() -> ShaderMaterial:
-	var material := create_variant_material("synth_fiber_traffic")
-	if material:
-		material.set_shader_parameter("board_map", _SynthTopology.get_board_texture())
-		material.set_shader_parameter("flow_map", _SynthTopology.get_flow_texture())
-		material.set_shader_parameter("stream_strength", SYNTH_STREAM_STRENGTH)
-		material.set_shader_parameter(
-			"time_scale", SYNTH_STREAM_TIME_SCALE * SYNTH_MASTER_TIME_SCALE
-		)
-		material.set_shader_parameter("packet_speed", SYNTH_PACKET_SPEED)
-		material.set_shader_parameter("packet_size", SYNTH_PACKET_SIZE)
-		material.set_shader_parameter("body_length", SYNTH_BODY_LENGTH)
-		material.set_shader_parameter("trail_length", SYNTH_TRAIL_LENGTH)
-		material.set_shader_parameter("synapse_strength", SYNTH_SYNAPSE_STRENGTH)
-		material.set_shader_parameter("rainbow_strength", SYNTH_RAINBOW_STRENGTH)
-		material.set_shader_parameter("bloom_strength", SYNTH_BLOOM_STRENGTH)
-		material.set_shader_parameter("journey_count", float(_SynthTopology.get_journey_count()))
-	return material
+	return _SynthMaterials.create_fiber_traffic_material()
 
 
 static func create_synth_fiber_deep_material() -> ShaderMaterial:
-	var material := create_variant_material("synth_fiber_deep")
-	if material:
-		material.set_shader_parameter("board_map", _SynthTopology.get_board_texture())
-		material.set_shader_parameter("flow_map", _SynthTopology.get_flow_texture())
-		material.set_shader_parameter("pulse_strength", SYNTH_TRAIL_STRENGTH)
-		material.set_shader_parameter(
-			"time_scale", SYNTH_TRAIL_TIME_SCALE * SYNTH_MASTER_TIME_SCALE
-		)
-		material.set_shader_parameter("packet_speed", SYNTH_TRAIL_PACKET_SPEED)
-		material.set_shader_parameter("packet_size", SYNTH_TRAIL_PACKET_SIZE)
-		material.set_shader_parameter("body_length", SYNTH_TRAIL_BODY_LENGTH)
-		material.set_shader_parameter("trail_length", SYNTH_TRAIL_LENGTH_SECONDARY)
-		material.set_shader_parameter("synapse_strength", SYNTH_TRAIL_SYNAPSE_STRENGTH)
-		material.set_shader_parameter("rainbow_strength", SYNTH_TRAIL_RAINBOW_STRENGTH)
-		material.set_shader_parameter("bloom_strength", SYNTH_TRAIL_BLOOM_STRENGTH)
-		material.set_shader_parameter("journey_count", float(_SynthTopology.get_journey_count()))
-	return material
+	return _SynthMaterials.create_fiber_deep_material()
 
 
 ## Compat aliases for older validation / tooling names.
@@ -748,62 +472,23 @@ static func create_synth_energy_pulse_material() -> ShaderMaterial:
 
 
 static func create_diamond_facets_material() -> ShaderMaterial:
-	var material := create_variant_material("diamond_facets")
-	if material:
-		material.set_shader_parameter("plate_strength", DIAMOND_PLATE_STRENGTH)
-		material.set_shader_parameter("fresnel_strength", DIAMOND_FRESNEL_STRENGTH)
-		material.set_shader_parameter("clarity_veil", DIAMOND_CLARITY_VEIL)
-		material.set_shader_parameter("seam_strength", DIAMOND_SEAM_STRENGTH)
-		material.set_shader_parameter("iridescence", DIAMOND_PLATE_IRIDESCENCE)
-		material.set_shader_parameter("time_scale", DIAMOND_LIGHT_TIME_SCALE)
-		material.set_shader_parameter("light_dir", DIAMOND_LIGHT_DIR)
-	return material
+	return _DiamondMaterials.create_facets_material()
 
 
 static func create_diamond_reflection_material() -> ShaderMaterial:
-	var material := create_variant_material("diamond_reflection")
-	if material:
-		material.set_shader_parameter("reflection_strength", DIAMOND_REFLECTION_STRENGTH)
-		material.set_shader_parameter("body_strength", DIAMOND_BODY_STRENGTH)
-		material.set_shader_parameter("rim_strength", DIAMOND_RIM_STRENGTH)
-		material.set_shader_parameter("iridescence", DIAMOND_SPECULAR_IRIDESCENCE)
-		material.set_shader_parameter("specular_white", DIAMOND_SPECULAR_WHITE)
-		material.set_shader_parameter("fire_strength", DIAMOND_FIRE_STRENGTH)
-		material.set_shader_parameter("time_scale", DIAMOND_LIGHT_TIME_SCALE)
-		material.set_shader_parameter("light_dir", DIAMOND_LIGHT_DIR)
-	return material
+	return _DiamondMaterials.create_reflection_material()
 
 
 static func create_diamond_refraction_material() -> ShaderMaterial:
-	## Unused in V1 look (no art warp). Kept for API compatibility.
-	var material := create_variant_material("diamond_refraction")
-	if material:
-		material.set_shader_parameter("warp_strength", DIAMOND_WARP_STRENGTH)
-		material.set_shader_parameter("clarity", DIAMOND_CLARITY)
-		material.set_shader_parameter("cool_lift", DIAMOND_COOL_LIFT)
-		material.set_shader_parameter("edge_sharpen", DIAMOND_EDGE_SHARPEN)
-	return material
+	return _DiamondMaterials.create_refraction_material()
 
 
 static func create_diamond_dispersion_material() -> ShaderMaterial:
-	var material := create_variant_material("diamond_dispersion")
-	if material:
-		material.set_shader_parameter("dispersion_strength", DIAMOND_DISPERSION_STRENGTH)
-		material.set_shader_parameter("peak_gate", DIAMOND_DISPERSION_PEAK_GATE)
-		material.set_shader_parameter("saturation", DIAMOND_DISPERSION_SATURATION)
-		material.set_shader_parameter("time_scale", DIAMOND_DISPERSION_TIME_SCALE)
-		material.set_shader_parameter("light_dir", DIAMOND_LIGHT_DIR)
-	return material
+	return _DiamondMaterials.create_dispersion_material()
 
 
 static func create_diamond_sparkle_material() -> ShaderMaterial:
-	var material := create_variant_material("diamond_sparkle")
-	if material:
-		material.set_shader_parameter("sparkle_strength", DIAMOND_SPARKLE_STRENGTH)
-		material.set_shader_parameter("time_scale", DIAMOND_SPARKLE_TIME_SCALE)
-		material.set_shader_parameter("sparkle_size", DIAMOND_SPARKLE_SIZE)
-		material.set_shader_parameter("light_dir", DIAMOND_LIGHT_DIR)
-	return material
+	return _DiamondMaterials.create_sparkle_material()
 
 
 ## Legacy aliases — retired glow layer maps to internal reflection.
@@ -812,19 +497,11 @@ static func create_diamond_glow_material() -> ShaderMaterial:
 
 
 static func create_negative_invert_material() -> ShaderMaterial:
-	var material := create_variant_material("negative_invert")
-	if material:
-		material.set_shader_parameter("brightness", NEGATIVE_ART_BRIGHTNESS)
-		material.set_shader_parameter("time_scale", NEGATIVE_TIME_SCALE)
-	return material
+	return _NegativeMaterials.create_invert_material()
 
 
 static func create_negative_edge_material() -> ShaderMaterial:
-	var material := create_variant_material("negative_edge")
-	if material:
-		material.set_shader_parameter("edge_strength", NEGATIVE_EDGE_STRENGTH)
-		material.set_shader_parameter("time_scale", NEGATIVE_TIME_SCALE)
-	return material
+	return _NegativeMaterials.create_edge_material()
 
 
 static func make_overlay_full_rect(overlay_node: ColorRect) -> void:
@@ -1137,36 +814,19 @@ static func _parse_layer_animation_type(animation_key: String) -> int:
 
 
 static func _create_named_variant_shader_material(shader_key: String) -> ShaderMaterial:
-	match shader_key:
-		"foil_rainbow":
-			return create_foil_rainbow_material()
-		"foil_soft_shine":
-			return create_foil_soft_shine_material()
-		"synth_pcb_board":
-			return create_synth_pcb_board_material()
-		"synth_fiber_traffic":
-			return create_synth_fiber_traffic_material()
-		"synth_fiber_deep":
-			return create_synth_fiber_deep_material()
-		# V1 keys redirect to V2 while old shader files remain unused.
-		"synth_circuit_traces":
-			return create_synth_pcb_board_material()
-		"synth_data_stream":
-			return create_synth_fiber_traffic_material()
-		"synth_energy_pulse":
-			return create_synth_fiber_deep_material()
-		"diamond_facets":
-			return create_diamond_facets_material()
-		"diamond_reflection":
-			return create_diamond_reflection_material()
-		"diamond_dispersion":
-			return create_diamond_dispersion_material()
-		"diamond_sparkle":
-			return create_diamond_sparkle_material()
-		"diamond_glow":
-			return create_diamond_reflection_material()
-		_:
-			return create_variant_material(shader_key)
+	var material := _FoilMaterials.create_named_shader_material(shader_key)
+	if material:
+		return material
+	material = _SynthMaterials.create_named_shader_material(shader_key)
+	if material:
+		return material
+	material = _DiamondMaterials.create_named_shader_material(shader_key)
+	if material:
+		return material
+	material = _NegativeMaterials.create_named_shader_material(shader_key)
+	if material:
+		return material
+	return create_variant_material(shader_key)
 
 
 static func _get_procedural_variant_texture(procedural_key: String) -> Texture2D:
@@ -1174,121 +834,14 @@ static func _get_procedural_variant_texture(procedural_key: String) -> Texture2D
 	if _variant_texture_cache.has(cache_key):
 		return _variant_texture_cache[cache_key]
 
-	var texture: Texture2D = null
-	match procedural_key:
-		"foil_grain":
-			texture = _build_foil_grain_texture()
-		"foil_glitter":
-			texture = _build_foil_speckle_texture(FOIL_GLITTER_DENSITY, FOIL_GLITTER_BRIGHTNESS, 211)
-		"foil_sparkle":
-			texture = _build_foil_speckle_texture(FOIL_SPARKLE_DENSITY, FOIL_SPARKLE_BRIGHTNESS, 733)
-		"synth_micro_circuit":
-			texture = _build_synth_micro_circuit_texture()
-		"synth_junction_pads":
-			texture = _SynthTopology.get_pad_texture()
-		"synth_data_nodes":
-			texture = _SynthTopology.get_pad_texture()
-		_:
-			push_warning("CardVisualLibrary: unknown procedural texture '%s'." % procedural_key)
+	var texture: Texture2D = _FoilMaterials.build_procedural_texture(procedural_key)
+	if texture == null:
+		texture = _SynthMaterials.build_procedural_texture(procedural_key)
+	if texture == null:
+		push_warning("CardVisualLibrary: unknown procedural texture '%s'." % procedural_key)
 
 	_variant_texture_cache[cache_key] = texture
 	return texture
-
-
-static func _build_foil_grain_texture() -> Texture2D:
-	## Film grain — fine isotropic speckles (no directional etch).
-	## High res + caller uses LINEAR filter (project default is nearest).
-	## MUL overlay — strength baked via FOIL_GRAIN_OPACITY.
-	var size := 1024
-	var coarse := FastNoiseLite.new()
-	coarse.seed = 17
-	coarse.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	coarse.frequency = FOIL_GRAIN_NOISE_SCALE * 0.22
-	coarse.fractal_type = FastNoiseLite.FRACTAL_FBM
-	coarse.fractal_octaves = 4
-
-	var fine := FastNoiseLite.new()
-	fine.seed = 91
-	fine.noise_type = FastNoiseLite.TYPE_VALUE
-	fine.frequency = FOIL_GRAIN_NOISE_SCALE * 1.35
-	fine.fractal_type = FastNoiseLite.FRACTAL_FBM
-	fine.fractal_octaves = 2
-
-	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
-	var strength := clampf(FOIL_GRAIN_OPACITY * 2.4, 0.02, 0.16)
-	for y in size:
-		for x in size:
-			var n1 := (coarse.get_noise_2d(float(x), float(y)) + 1.0) * 0.5
-			var n2 := (fine.get_noise_2d(float(x), float(y)) + 1.0) * 0.5
-			# Mostly fine speckles with a soft low-frequency lift (film stock).
-			var n := lerpf(n2, n1, 0.28)
-			n = clampf((n - 0.5) * FOIL_GRAIN_CONTRAST + 0.5, 0.0, 1.0)
-			var g := 1.0 + (n - 0.5) * strength * 2.0
-			g = clampf(g, 0.88, 1.08)
-			img.set_pixel(x, y, Color(g, g, g, 1.0))
-	img.generate_mipmaps()
-	return ImageTexture.create_from_image(img)
-
-
-static func _build_foil_speckle_texture(density_threshold: float, brightness: float, seed: int) -> Texture2D:
-	## Sparse reflective dots. Higher density_threshold => fewer speckles.
-	var size := 512
-	var noise := FastNoiseLite.new()
-	noise.seed = seed
-	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	noise.frequency = 0.55
-	noise.fractal_type = FastNoiseLite.FRACTAL_NONE
-
-	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0, 0, 0, 0))
-	for y in size:
-		for x in size:
-			var n := (noise.get_noise_2d(float(x), float(y)) + 1.0) * 0.5
-			if n < density_threshold:
-				continue
-			# Tiny hot spots only — no large blobs.
-			var spark := smoothstep(density_threshold, 1.0, n)
-			spark = pow(spark, 3.2) * brightness
-			if spark < 0.12:
-				continue
-			img.set_pixel(x, y, Color(1.0, 1.0, 1.0, spark))
-	img.generate_mipmaps()
-	return ImageTexture.create_from_image(img)
-
-
-static func _build_synth_micro_circuit_texture() -> Texture2D:
-	## Microscopic PCB etch — extremely fine Manhattan grid (MUL, static).
-	var size := 1024
-	var fine := FastNoiseLite.new()
-	fine.seed = 67
-	fine.noise_type = FastNoiseLite.TYPE_VALUE
-	fine.frequency = SYNTH_MICRO_CIRCUIT_FREQUENCY * 1.8
-	fine.fractal_type = FastNoiseLite.FRACTAL_NONE
-
-	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
-	var strength := clampf(SYNTH_MICRO_CIRCUIT_STRENGTH * 2.2, 0.015, 0.08)
-	for y in size:
-		for x in size:
-			var fx := float(x) / float(size)
-			var fy := float(y) / float(size)
-			# Fine orthogonal etch lines.
-			var grid := vec2_like_grid(fx, fy, 48.0)
-			var h_line: float = 1.0 - smoothstep(0.0, 0.012, absf(grid.y - 0.5))
-			var v_line: float = 1.0 - smoothstep(0.0, 0.012, absf(grid.x - 0.5))
-			var etch: float = maxf(h_line, v_line) * 0.55
-			var n := (fine.get_noise_2d(float(x), float(y)) + 1.0) * 0.5
-			etch = clampf(etch + (n - 0.5) * 0.08, 0.0, 1.0)
-			var g: float = 1.0 - etch * strength
-			g = clampf(g, 0.94, 1.0)
-			img.set_pixel(x, y, Color(g, g, g, 1.0))
-	img.generate_mipmaps()
-	return ImageTexture.create_from_image(img)
-
-
-static func vec2_like_grid(fx: float, fy: float, cells: float) -> Vector2:
-	var gx := fmod(fx * cells, 1.0)
-	var gy := fmod(fy * cells, 1.0)
-	return Vector2(gx, gy)
 
 
 static func _variant_from_folder_key(folder_key: String) -> CardData.Variant:

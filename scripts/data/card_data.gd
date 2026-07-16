@@ -81,16 +81,6 @@ func duplicate_card() -> CardData:
 	return copy
 
 
-func get_frame_key() -> String:
-	if not frame.is_empty():
-		return frame.to_lower()
-	return CardVisualLibrary.FRAME_KEYS.get(rarity, "common")
-
-
-func get_back_type() -> CardVisualLibrary.CardBackType:
-	return CardVisualLibrary.parse_card_back(card_back)
-
-
 static func get_rarity_color(rarity_value: Rarity) -> Color:
 	return RARITY_COLORS.get(rarity_value, Color.WHITE)
 

@@ -93,7 +93,9 @@ func process_variant_idle(delta: float) -> void:
 
 
 func apply_frame(card_data: CardData) -> void:
-	var frame := CardVisualLibrary.get_frame_texture(card_data.get_frame_key())
+	var frame := CardVisualLibrary.get_frame_texture(
+		CardVisualLibrary.resolve_frame_key(card_data)
+	)
 	if frame != null:
 		frame_texture.texture = frame
 		frame_texture.visible = true

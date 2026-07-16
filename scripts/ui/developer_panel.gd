@@ -72,3 +72,5 @@ func _on_clear_collection_pressed() -> void:
 
 func _on_reset_runtime_pressed() -> void:
 	CollectionManager.reset_runtime_data()
+	PackInventoryManager.reset_runtime_data()
+	GameManager.set_selected_pack("")

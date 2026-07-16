@@ -81,7 +81,6 @@ func register_card(card: CardData) -> void:
 	_cards_by_id[card.card_id] = card
 	_add_to_rarity_bucket(card)
 	_add_to_set_bucket(card)
-	CardVisualLibrary.validate_card_assets(card)
 
 
 func _card_matches_pack(card: CardData, pack_config: PackConfig) -> bool:

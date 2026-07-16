@@ -354,7 +354,8 @@ The renderer and module split are considered **stable**. Prefer data-driven addi
 - **Gameplay loop comes first.** If a feature does not improve open-pack → collect → repeat, defer it.
 - **Do not over-engineer.** Small, focused diffs; no speculative abstractions.
 - **Keep CardScene lightweight.** New card behavior → `CardRenderer`, `CardAnimation`, or `CardVisualLibrary`.
-- **CardVisualLibrary owns all visual assets.** Never hardcode `res://assets/...` in UI scripts.
+- **CardVisualLibrary owns all visual assets.** Never hardcode `res://assets/...` in UI scripts. Variant FX factories live in sibling modules (`FoilMaterials`, etc.); CVL remains the public facade.
+- **Data layer stays presentation-free.** `CardData` / `CardDatabase` store plain frame and card_back strings; parsing and asset validation live in `CardVisualLibrary` / the renderer only.
 - **Pack pool filtering lives in `CardDatabase.get_cards_for_pack()`** — not in `PackGenerator` or UI.
 - **Duplicate stacking is view-only.** `CollectionManager` always stores individual copies with `instance_id`.
 - **Protected render layers must not move.** Reveal lift animates Card root `position.y`; flip uses `FlipPivot.scale.x` only.

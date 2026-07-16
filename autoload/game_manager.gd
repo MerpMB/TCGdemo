@@ -20,17 +20,69 @@ var _developer_panel: CanvasLayer
 var _card_viewer: CanvasLayer
 var _is_transitioning := false
 var selected_pack_id: String = ""
+var _visual_warmup_done := false
 
 
 func _ready() -> void:
 	_setup_fade_overlay()
 	_setup_developer_panel()
 	_setup_card_viewer()
+	## After other autoloads finish _ready (CardDatabase must exist for art prefetch).
+	call_deferred("_warmup_visual_assets")
 
 
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("toggle_developer_panel"):
 		toggle_developer_panel()
+
+
+## Prefetch shaders, procedural maps, Synth bake, frames, and catalog art at boot
+## so pack opening does not hitch on first Foil / Diamond / Synth / art resolve.
+func _warmup_visual_assets() -> void:
+	if _visual_warmup_done:
+		return
+	_visual_warmup_done = true
+
+	## Let MainMenu mount one frame before the heavier CPU work.
+	await get_tree().process_frame
+
+	var materials: Array[ShaderMaterial] = CardVisualLibrary.warmup(CardDatabase)
+	await _force_shader_gpu_compile(materials)
+
+
+## Draw each warmed material once offscreen so the GPU compiles shaders now,
+## not during the first pack-card fly-out.
+func _force_shader_gpu_compile(materials: Array[ShaderMaterial]) -> void:
+	if materials.is_empty():
+		return
+
+	var layer := CanvasLayer.new()
+	layer.layer = -100
+	layer.name = "VisualWarmupLayer"
+	add_child(layer)
+
+	var host := Control.new()
+	host.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	host.size = Vector2(8, 8)
+	host.position = Vector2(-64, -64)
+	layer.add_child(host)
+
+	for material in materials:
+		if material == null:
+			continue
+		var rect := ColorRect.new()
+		rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rect.size = Vector2(4, 4)
+		rect.color = Color.WHITE
+		rect.material = material
+		host.add_child(rect)
+
+	## Two frames: one to submit draw, one to finish compile on most backends.
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	layer.queue_free()
+	print("GameManager: variant shader GPU compile pass finished.")
 
 
 func go_to_main_menu() -> void:

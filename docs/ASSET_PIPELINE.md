@@ -89,15 +89,19 @@ CardRenderer.apply()
     ↓
 CardVisualLibrary
     ├── resolve_artwork(card)           explicit artwork field, then <card_id>.png
+    ├── resolve_frame_key(card)         frame string or rarity → key (presentation only)
     ├── get_frame_texture(frame_key)
     ├── get_card_back_texture(card_back)
+    ├── parse_card_back(card_back)      string → CardBackType (presentation only)
     ├── get_variant_overlay_texture()   optional PNG (future)
     └── create_*_material()             shader fallback for variants
     ↓
 CardScene nodes (textures / materials applied)
 ```
 
-On startup, `CardDatabase` registers each card and calls `CardVisualLibrary.validate_card_assets()` (non-fatal).
+`CardData` stores `frame` and `card_back` as plain strings. Frame/back parsing lives only in `CardVisualLibrary` / the renderer — not in the catalog layer.
+
+`CardVisualLibrary.validate_card_assets()` is optional / dev-only and is **not** called during `CardDatabase` registration.
 
 ---
 

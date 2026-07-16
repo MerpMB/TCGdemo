@@ -110,7 +110,11 @@ func _process(delta: float) -> void:
 func setup(card_data: CardData, mode: DisplayMode = DisplayMode.PACK) -> void:
 	_card_data = card_data
 	_display_mode = mode
-	_back_type = card_data.get_back_type() if card_data else CardVisualLibrary.CardBackType.DEFAULT
+	_back_type = (
+		CardVisualLibrary.parse_card_back(card_data.card_back)
+		if card_data
+		else CardVisualLibrary.CardBackType.DEFAULT
+	)
 	_interaction.is_interactive = mode == DisplayMode.GALLERY
 	_pack_reveal_enabled = false
 	_is_revealing = false
