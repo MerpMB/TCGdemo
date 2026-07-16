@@ -1,161 +1,306 @@
-// Shared Synth topology — static neural PCB + helpers for living signal traffic.
-// Geometry never animates. Motion is authored only in packet/synapse shaders.
+// DEPRECATED — Synth V1 GPU topology. Synth V2 bakes architecture in SynthTopology.gd.
+// Shared Synth topology — intentional PCB architecture (not probabilistic grid).
+// Geometry is designed modules: buses, L/T junctions, loops, branching corridors.
+// Packets travel through this architecture; they do not invent the layout.
 
 float synth_hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-
-float synth_soft_noise(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	f = f * f * (3.0 - 2.0 * f);
-	float a = synth_hash(i);
-	float b = synth_hash(i + vec2(1.0, 0.0));
-	float c = synth_hash(i + vec2(0.0, 1.0));
-	float d = synth_hash(i + vec2(1.0, 1.0));
-	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-
-float synth_region_mask(vec2 uv) {
-	float coarse = synth_soft_noise(uv * vec2(2.4, 3.0) + vec2(0.17, 0.31));
-	float cells = synth_soft_noise(uv * vec2(5.5, 6.8) + vec2(4.2, 1.8));
-	float region = mix(coarse, cells, 0.38);
-	return smoothstep(0.67, 0.86, region);
 }
 
 float synth_line_mask(float dist, float half_width) {
 	return 1.0 - smoothstep(0.0, half_width, dist);
 }
 
+// Distance from point to segment AB, plus arc-length parameter along AB.
+float synth_seg_dist(vec2 p, vec2 a, vec2 b) {
+	vec2 pa = p - a;
+	vec2 ba = b - a;
+	float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+	return length(pa - ba * h);
+}
+
+float synth_seg_param(vec2 p, vec2 a, vec2 b) {
+	vec2 pa = p - a;
+	vec2 ba = b - a;
+	return clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+}
+
+// ---- Designed PCB modules (UV space, card is taller than wide) ----
+// Sparse edge composition with a large empty center — reference style.
+
+const float SYNTH_ROUTE_COUNT = 5.0;
+
+// Accumulate closest segment on a route: updates best_d / best_t / best_road.
+void synth_accum_seg(
+	vec2 uv,
+	vec2 a,
+	vec2 b,
+	float road,
+	float arc_base,
+	float route_len,
+	inout float best_d,
+	inout float best_t,
+	inout float best_road
+) {
+	float d = synth_seg_dist(uv, a, b);
+	if (d < best_d) {
+		best_d = d;
+		float local = synth_seg_param(uv, a, b);
+		float seg_len = length(b - a);
+		best_t = (arc_base + local * seg_len) / max(route_len, 1e-4);
+		best_road = road;
+	}
+}
+
+void synth_accum_node(vec2 uv, vec2 n, inout float best_j) {
+	best_j = min(best_j, length(uv - n));
+}
+
+// Sample designed topology: distance field, normalized travel [0,1], route id, junction dist.
+void synth_sample_topo(vec2 uv, out float dist, out float travel, out float road, out float junc) {
+	float best_d = 1e3;
+	float best_t = 0.0;
+	float best_road = 0.0;
+	float best_j = 1e3;
+
+	// ============================================================
+	// Route 0 — bottom-left L into long bottom bus (continuous journey)
+	// ============================================================
+	{
+		float road_id = 0.0;
+		vec2 p0 = vec2(0.08, 0.22);
+		vec2 p1 = vec2(0.08, 0.09);
+		vec2 p2 = vec2(0.48, 0.09);
+		vec2 p3 = vec2(0.48, 0.16);
+		vec2 p4 = vec2(0.62, 0.16);
+		float L = length(p1 - p0) + length(p2 - p1) + length(p3 - p2) + length(p4 - p3);
+		float a0 = 0.0;
+		float a1 = length(p1 - p0);
+		float a2 = a1 + length(p2 - p1);
+		float a3 = a2 + length(p3 - p2);
+		synth_accum_seg(uv, p0, p1, road_id, a0, L, best_d, best_t, best_road);
+		synth_accum_seg(uv, p1, p2, road_id, a1, L, best_d, best_t, best_road);
+		synth_accum_seg(uv, p2, p3, road_id, a2, L, best_d, best_t, best_road);
+		synth_accum_seg(uv, p3, p4, road_id, a3, L, best_d, best_t, best_road);
+		synth_accum_node(uv, p1, best_j); // L corner
+		synth_accum_node(uv, p2, best_j); // step
+		synth_accum_node(uv, p3, best_j); // T-ish bend
+	}
+
+	// ============================================================
+	// Route 1 — left mid T-junction (stem + arms)
+	// ============================================================
+	{
+		float road_id = 1.0;
+		vec2 c = vec2(0.12, 0.48);
+		vec2 left = vec2(0.05, 0.48);
+		vec2 right = vec2(0.26, 0.48);
+		vec2 down = vec2(0.12, 0.36);
+		float L = length(c - left) + length(right - c) + length(c - down);
+		synth_accum_seg(uv, left, c, road_id, 0.0, L, best_d, best_t, best_road);
+		synth_accum_seg(uv, c, right, road_id, length(c - left), L, best_d, best_t, best_road);
+		synth_accum_seg(uv, c, down, road_id, length(c - left) + length(right - c), L, best_d, best_t, best_road);
+		synth_accum_node(uv, c, best_j);
+	}
+
+	// ============================================================
+	// Route 2 — right vertical bus with two branch T stubs (long corridor)
+	// ============================================================
+	{
+		float road_id = 2.0;
+		vec2 top = vec2(0.90, 0.74);
+		vec2 mid = vec2(0.90, 0.48);
+		vec2 bot = vec2(0.90, 0.22);
+		vec2 stub_a = vec2(0.76, 0.58);
+		vec2 stub_b = vec2(0.78, 0.34);
+		vec2 j_a = vec2(0.90, 0.58);
+		vec2 j_b = vec2(0.90, 0.34);
+		float L = length(mid - top) + length(bot - mid) + length(j_a - stub_a) + length(j_b - stub_b);
+		float a0 = 0.0;
+		float a1 = length(mid - top);
+		float a2 = a1 + length(bot - mid);
+		float a3 = a2 + length(j_a - stub_a);
+		synth_accum_seg(uv, top, mid, road_id, a0, L, best_d, best_t, best_road);
+		synth_accum_seg(uv, mid, bot, road_id, a1, L, best_d, best_t, best_road);
+		synth_accum_seg(uv, stub_a, j_a, road_id, a2, L, best_d, best_t, best_road);
+		synth_accum_seg(uv, stub_b, j_b, road_id, a3, L, best_d, best_t, best_road);
+		synth_accum_node(uv, j_a, best_j);
+		synth_accum_node(uv, j_b, best_j);
+		synth_accum_node(uv, mid, best_j);
+	}
+
+	// ============================================================
+	// Route 3 — top-right T + stair / zig module
+	// ============================================================
+	{
+		float road_id = 3.0;
+		vec2 t0 = vec2(0.68, 0.90);
+		vec2 t1 = vec2(0.94, 0.90);
+		vec2 stem = vec2(0.84, 0.82);
+		vec2 j = vec2(0.84, 0.90);
+		vec2 z0 = vec2(0.76, 0.76);
+		vec2 z1 = vec2(0.92, 0.76);
+		vec2 z2 = vec2(0.92, 0.68);
+		vec2 z3 = vec2(0.80, 0.68);
+		float L = length(t1 - t0) + length(j - stem)
+			+ length(z1 - z0) + length(z2 - z1) + length(z3 - z2);
+		float a0 = 0.0;
+		float a1 = length(t1 - t0);
+		float a2 = a1 + length(j - stem);
+		float a3 = a2 + length(z1 - z0);
+		float a4 = a3 + length(z2 - z1);
+		synth_accum_seg(uv, t0, t1, road_id, a0, L, best_d, best_t, best_road);
+		synth_accum_seg(uv, j, stem, road_id, a1, L, best_d, best_t, best_road);
+		synth_accum_seg(uv, z0, z1, road_id, a2, L, best_d, best_t, best_road);
+		synth_accum_seg(uv, z1, z2, road_id, a3, L, best_d, best_t, best_road);
+		synth_accum_seg(uv, z2, z3, road_id, a4, L, best_d, best_t, best_road);
+		synth_accum_node(uv, j, best_j);
+		synth_accum_node(uv, z1, best_j);
+		synth_accum_node(uv, z2, best_j);
+	}
+
+	// ============================================================
+	// Route 4 — bottom-right L / stub cluster
+	// ============================================================
+	{
+		float road_id = 4.0;
+		vec2 a = vec2(0.70, 0.11);
+		vec2 b = vec2(0.92, 0.11);
+		vec2 c = vec2(0.92, 0.30);
+		vec2 stub = vec2(0.80, 0.20);
+		vec2 j = vec2(0.92, 0.20);
+		float L = length(b - a) + length(c - b) + length(j - stub);
+		float a0 = 0.0;
+		float a1 = length(b - a);
+		synth_accum_seg(uv, a, b, road_id, a0, L, best_d, best_t, best_road);
+		synth_accum_seg(uv, b, c, road_id, a1, L, best_d, best_t, best_road);
+		synth_accum_seg(uv, stub, j, road_id, a1 + length(c - b), L, best_d, best_t, best_road);
+		synth_accum_node(uv, b, best_j);
+		synth_accum_node(uv, j, best_j);
+	}
+
+	dist = best_d;
+	travel = best_t;
+	road = best_road;
+	junc = best_j;
+}
+
+// ---- Public field API (used by idle + packet shaders) ----
+
+float synth_region_mask(vec2 uv) {
+	// Negative space is authored by module placement, not a noise mask.
+	float d;
+	float t;
+	float r;
+	float j;
+	synth_sample_topo(uv, d, t, r, j);
+	return 1.0 - smoothstep(0.045, 0.12, d);
+}
+
+float synth_trace_field(vec2 uv) {
+	float d;
+	float t;
+	float r;
+	float j;
+	synth_sample_topo(uv, d, t, r, j);
+	float core = synth_line_mask(d, 0.0045);
+	float glow = synth_line_mask(d, 0.010) * 0.22;
+	float node = synth_line_mask(j, 0.008) * 0.55;
+	return max(max(core, glow), node);
+}
+
+float synth_trace_core(vec2 uv) {
+	float d;
+	float t;
+	float r;
+	float j;
+	synth_sample_topo(uv, d, t, r, j);
+	return synth_line_mask(d, 0.0055);
+}
+
+float synth_junction_mask(vec2 uv) {
+	float d;
+	float t;
+	float r;
+	float j;
+	synth_sample_topo(uv, d, t, r, j);
+	// Meaningful routing nodes only — designed junctions, not accidental crossings.
+	return synth_line_mask(j, 0.011) * synth_line_mask(d, 0.014);
+}
+
+float synth_trace_soft(vec2 uv) {
+	float d;
+	float t;
+	float r;
+	float j;
+	synth_sample_topo(uv, d, t, r, j);
+	return max(synth_line_mask(d, 0.014), synth_line_mask(j, 0.018));
+}
+
+float synth_trace_bloom(vec2 uv) {
+	float d;
+	float t;
+	float r;
+	float j;
+	synth_sample_topo(uv, d, t, r, j);
+	float bloom = max(synth_line_mask(d, 0.028), synth_line_mask(j, 0.032));
+	return pow(bloom, 1.25);
+}
+
+// Normalized arc-length along the closest designed route [0,1].
+float synth_travel_coord(vec2 uv) {
+	float d;
+	float t;
+	float r;
+	float j;
+	synth_sample_topo(uv, d, t, r, j);
+	return t;
+}
+
+// Secondary axis hint near junctions (for branch glow).
+float synth_cross_travel_coord(vec2 uv) {
+	float d;
+	float t;
+	float r;
+	float j;
+	synth_sample_topo(uv, d, t, r, j);
+	return fract(t * 2.7 + r * 0.37);
+}
+
+float synth_road_id(vec2 uv) {
+	float d;
+	float t;
+	float r;
+	float j;
+	synth_sample_topo(uv, d, t, r, j);
+	return r;
+}
+
+// Legacy name kept for packet shaders that still sample cell space.
 vec2 synth_grid_uv(vec2 uv) {
 	return uv * vec2(8.0, 11.0);
 }
 
-float synth_h_gate(vec2 cell) {
-	return step(0.54, synth_hash(cell));
-}
-
-float synth_v_gate(vec2 cell) {
-	return step(0.57, synth_hash(cell + vec2(19.0, 7.0)));
-}
-
-float synth_trace_field(vec2 uv) {
-	vec2 grid_uv = synth_grid_uv(uv);
-	vec2 cell = floor(grid_uv);
-	vec2 f = fract(grid_uv);
-
-	float h_gate = synth_h_gate(cell);
-	float v_gate = synth_v_gate(cell);
-
-	float road_w = 0.026;
-	float h_line = h_gate * synth_line_mask(abs(f.y - 0.5), road_w);
-	float v_line = v_gate * synth_line_mask(abs(f.x - 0.5), road_w);
-
-	float glow_w = 0.055;
-	float h_glow = h_gate * synth_line_mask(abs(f.y - 0.5), glow_w) * 0.18;
-	float v_glow = v_gate * synth_line_mask(abs(f.x - 0.5), glow_w) * 0.18;
-
-	float junction = h_gate * v_gate * synth_line_mask(length(f - 0.5), 0.06);
-	float traces = max(max(h_line, v_line), junction);
-	traces = max(traces, max(h_glow, v_glow));
-	return traces * synth_region_mask(uv);
-}
-
-float synth_trace_core(vec2 uv) {
-	vec2 grid_uv = synth_grid_uv(uv);
-	vec2 cell = floor(grid_uv);
-	vec2 f = fract(grid_uv);
-
-	float h_gate = synth_h_gate(cell);
-	float v_gate = synth_v_gate(cell);
-
-	float road_w = 0.032;
-	float h_line = h_gate * synth_line_mask(abs(f.y - 0.5), road_w);
-	float v_line = v_gate * synth_line_mask(abs(f.x - 0.5), road_w);
-	return max(h_line, v_line) * synth_region_mask(uv);
-}
-
-float synth_junction_mask(vec2 uv) {
-	vec2 grid_uv = synth_grid_uv(uv);
-	vec2 cell = floor(grid_uv);
-	vec2 f = fract(grid_uv);
-	float both = synth_h_gate(cell) * synth_v_gate(cell);
-	return both * synth_line_mask(length(f - 0.5), 0.10) * synth_region_mask(uv);
-}
-
-// Continuous Manhattan travel with soft L-turn blending at junctions.
-float synth_travel_coord(vec2 uv) {
-	vec2 g = synth_grid_uv(uv);
-	vec2 cell = floor(g);
-	vec2 f = fract(g);
-	float h = synth_h_gate(cell);
-	float v = synth_v_gate(cell);
-
-	float h_travel = g.x;
-	float v_travel = g.y + (cell.x - cell.y);
-
-	if (h > 0.5 && v > 0.5) {
-		// Wide soft blend through the corner so the wave bridges the turn.
-		float on_h = 1.0 - smoothstep(0.0, 0.28, abs(f.y - 0.5));
-		float on_v = 1.0 - smoothstep(0.0, 0.28, abs(f.x - 0.5));
-		float w = on_h + on_v;
-		float blended = mix(v_travel, h_travel, on_h / max(w, 0.001));
-		// Pull toward junction center path length for smoother corner occupancy.
-		float corner = (h_travel + v_travel) * 0.5;
-		float corner_w = 1.0 - smoothstep(0.0, 0.22, length(f - 0.5));
-		return mix(blended, corner, corner_w * 0.45);
-	}
-	if (h >= v) {
-		return h_travel;
-	}
-	return v_travel;
-}
-
-float synth_cross_travel_coord(vec2 uv) {
-	vec2 g = synth_grid_uv(uv);
-	vec2 cell = floor(g);
-	float h = synth_h_gate(cell);
-	float v = synth_v_gate(cell);
-	if (h >= v) {
-		return g.y + (cell.x - cell.y);
-	}
-	return g.x;
-}
-
-float synth_road_id(vec2 uv) {
-	vec2 cell = floor(synth_grid_uv(uv));
-	return synth_hash(cell + vec2(3.7, 11.3));
-}
-
-// Signal silhouette: one continuous flowing wave (no capsule tip).
-// behind=0 at leading edge; smooth falloff into a long soft wake.
+// Signal silhouette: continuous flowing wave.
 float synth_signal_profile(float behind, float head_w, float body_w, float trail_w) {
 	float extent = body_w + trail_w * 2.6;
 	if (behind > extent) {
 		return 0.0;
 	}
-
-	// Soft leading edge (not a hard white bead).
 	float lead = exp(-behind / max(head_w * 1.8, 0.001));
-	// Long contiguous body that can cover multiple segments.
 	float body = exp(-behind / max(body_w * 0.85, 0.001));
-	// Extended wake — fades gradually into idle.
 	float wake = exp(-behind / max(trail_w * 1.15, 0.001)) * 0.55;
-
 	float wave = max(lead * 0.9, max(body, wake));
-	// Gentle taper so the front still reads as the focus without a capsule.
 	float focus = 1.0 - smoothstep(0.0, body_w * 1.4, behind) * 0.22;
 	return wave * focus;
 }
 
-// Soft corner bridge — keeps glow continuous through 90° turns.
 float synth_corner_bridge(vec2 uv, float behind, float span) {
 	float junction = synth_junction_mask(uv);
 	float near = 1.0 - smoothstep(0.0, max(span, 0.001), behind);
 	return junction * near * near;
 }
 
-// Idle board: cool cyan/teal only (no rainbow).
 vec3 synth_palette(float t) {
 	vec3 teal = vec3(0.12, 0.72, 0.82);
 	vec3 cyan = vec3(0.18, 0.88, 1.0);
@@ -164,14 +309,13 @@ vec3 synth_palette(float t) {
 	return mix(c, blue, smoothstep(0.55, 1.0, t) * 0.35);
 }
 
-// Packet-only iridescence: cyan → blue → violet → magenta → white.
 vec3 synth_iridescent(float t) {
 	float x = fract(t);
-	vec3 c0 = vec3(0.25, 0.95, 1.00); // cyan
-	vec3 c1 = vec3(0.28, 0.55, 1.00); // electric blue
-	vec3 c2 = vec3(0.58, 0.32, 1.00); // violet
-	vec3 c3 = vec3(0.95, 0.38, 0.88); // magenta
-	vec3 c4 = vec3(0.96, 0.98, 1.00); // white highlight
+	vec3 c0 = vec3(0.25, 0.95, 1.00);
+	vec3 c1 = vec3(0.28, 0.55, 1.00);
+	vec3 c2 = vec3(0.58, 0.32, 1.00);
+	vec3 c3 = vec3(0.95, 0.38, 0.88);
+	vec3 c4 = vec3(0.96, 0.98, 1.00);
 	float s = x * 4.0;
 	vec3 c;
 	if (s < 1.0) {
@@ -185,33 +329,4 @@ vec3 synth_iridescent(float t) {
 	}
 	vec3 cool = vec3(0.55, 0.82, 1.0);
 	return mix(cool, c, 0.78);
-}
-
-// Thick soft path for readable packet body.
-float synth_trace_soft(vec2 uv) {
-	vec2 grid_uv = synth_grid_uv(uv);
-	vec2 cell = floor(grid_uv);
-	vec2 f = fract(grid_uv);
-	float h_gate = synth_h_gate(cell);
-	float v_gate = synth_v_gate(cell);
-	float soft_w = 0.095;
-	float h_line = h_gate * synth_line_mask(abs(f.y - 0.5), soft_w);
-	float v_line = v_gate * synth_line_mask(abs(f.x - 0.5), soft_w);
-	float junction = h_gate * v_gate * synth_line_mask(length(f - 0.5), 0.16);
-	return max(max(h_line, v_line), junction) * synth_region_mask(uv);
-}
-
-// Wide bloom halo — emits light outside the trace line (packet only).
-float synth_trace_bloom(vec2 uv) {
-	vec2 grid_uv = synth_grid_uv(uv);
-	vec2 cell = floor(grid_uv);
-	vec2 f = fract(grid_uv);
-	float h_gate = synth_h_gate(cell);
-	float v_gate = synth_v_gate(cell);
-	float bloom_w = 0.18;
-	float h_line = h_gate * synth_line_mask(abs(f.y - 0.5), bloom_w);
-	float v_line = v_gate * synth_line_mask(abs(f.x - 0.5), bloom_w);
-	float junction = h_gate * v_gate * synth_line_mask(length(f - 0.5), 0.22);
-	float bloom = max(max(h_line, v_line), junction);
-	return pow(bloom, 1.35) * synth_region_mask(uv);
 }

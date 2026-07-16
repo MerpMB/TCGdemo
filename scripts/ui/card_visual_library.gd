@@ -5,6 +5,7 @@ extends RefCounted
 ## Missing textures return null (or StyleBox fallbacks) so cards always render.
 
 const _VariantLayer := preload("res://scripts/ui/variant_layer.gd")
+const _SynthTopology := preload("res://scripts/ui/synth_topology.gd")
 
 
 enum CardBackType {
@@ -124,50 +125,50 @@ const FOIL_SPARKLE_SIZE := 0.92
 const FOIL_SPARKLE_BRIGHTNESS := 0.44
 
 # ---------------------------------------------------------------------------
-# Synth material tuning (production) — cyber circuitry, emissive digital energy.
-# Layer order: micro circuit → trace network → data stream → energy pulse → nodes.
-# Occupies ~20–40% of surface; artwork-first. No rainbow / metal / glitter.
+# Synth V2 — premium PCB architecture + fiber traffic.
+# Topology baked by SynthTopology (static). Packets only animate along journeys.
+# Layer order: micro etch → pcb board → fiber traffic → fiber deep → pads.
+# Artwork-first; iridescence on packets only.
 # ---------------------------------------------------------------------------
 
-## Shared motion clock — multiplies continuous signal travel only.
 const SYNTH_MASTER_TIME_SCALE := 1.0
 
 ## 1. Micro Circuit Texture — faint PCB etch (MUL).
-const SYNTH_MICRO_CIRCUIT_STRENGTH := 0.028
+const SYNTH_MICRO_CIRCUIT_STRENGTH := 0.024
 const SYNTH_MICRO_CIRCUIT_FREQUENCY := 2.4
 
-## 2. Circuit Trace Network — nearly invisible idle cyan/teal PCB.
-const SYNTH_TRACE_STRENGTH := 0.07
+## 2. PCB Board — baked idle architecture (beautiful with animation off).
+const SYNTH_TRACE_STRENGTH := 0.11
 const SYNTH_TRACE_EDGE_GLOW := 0.008
+const SYNTH_JUNCTION_BOOST := 0.95
+const SYNTH_FIBER_HALO := 0.70
 
-## 3. Primary signals — sparse elegant long-route waves (brightness locked).
-const SYNTH_STREAM_STRENGTH := 1.15
-const SYNTH_STREAM_TIME_SCALE := 0.48
-const SYNTH_PACKET_SPEED := 0.78
-const SYNTH_PACKET_SIZE := 0.09
-const SYNTH_BODY_LENGTH := 0.38
-const SYNTH_TRAIL_LENGTH := 0.55
-const SYNTH_SYNAPSE_STRENGTH := 1.20
+## 3. Primary fiber traffic — thin pulses run edge→center on many journeys.
+const SYNTH_STREAM_STRENGTH := 1.05
+const SYNTH_STREAM_TIME_SCALE := 0.52
+const SYNTH_PACKET_SPEED := 0.92
+const SYNTH_PACKET_SIZE := 0.055
+const SYNTH_BODY_LENGTH := 0.55
+const SYNTH_TRAIL_LENGTH := 0.72
+const SYNTH_SYNAPSE_STRENGTH := 0.95
 const SYNTH_RAINBOW_STRENGTH := 0.88
-const SYNTH_BLOOM_STRENGTH := 0.72
+const SYNTH_BLOOM_STRENGTH := 0.58
 
-## 4. Deep thoughts — very rare long-route waves.
-const SYNTH_TRAIL_STRENGTH := 0.55
-const SYNTH_TRAIL_TIME_SCALE := 0.26
-const SYNTH_TRAIL_PACKET_SPEED := 0.48
-const SYNTH_TRAIL_PACKET_SIZE := 0.095
-const SYNTH_TRAIL_BODY_LENGTH := 0.42
-const SYNTH_TRAIL_LENGTH_SECONDARY := 0.62
-const SYNTH_TRAIL_SYNAPSE_STRENGTH := 0.95
+## 4. Deep fiber — rarer alternate journeys + memorable flashes.
+const SYNTH_TRAIL_STRENGTH := 0.48
+const SYNTH_TRAIL_TIME_SCALE := 0.28
+const SYNTH_TRAIL_PACKET_SPEED := 0.55
+const SYNTH_TRAIL_PACKET_SIZE := 0.06
+const SYNTH_TRAIL_BODY_LENGTH := 0.60
+const SYNTH_TRAIL_LENGTH_SECONDARY := 0.78
+const SYNTH_TRAIL_SYNAPSE_STRENGTH := 0.75
 const SYNTH_TRAIL_RAINBOW_STRENGTH := 0.82
-const SYNTH_TRAIL_BLOOM_STRENGTH := 0.55
+const SYNTH_TRAIL_BLOOM_STRENGTH := 0.45
 
-## 5. Tiny Data Nodes — barely-there standby junctions.
-const SYNTH_NODE_OPACITY := 0.05
-const SYNTH_NODE_DENSITY := 0.994
-const SYNTH_NODE_PULSE_SPEED := 0.06
-const SYNTH_NODE_SIZE := 0.92
-const SYNTH_NODE_BRIGHTNESS := 0.28
+## 5. Junction pads — baked vias from topology (ADD, slow pulse).
+const SYNTH_NODE_OPACITY := 0.055
+const SYNTH_NODE_PULSE_SPEED := 0.05
+const SYNTH_NODE_SIZE := 1.0
 
 ## Per-variant layer blueprints — renderer consumes materialized VariantLayer instances only.
 ## Layer type keys: texture, shader, color, particles
@@ -247,9 +248,9 @@ const VARIANT_LAYER_BLUEPRINTS := {
 			"blend_mode": "mul",
 		},
 		{
-			"id": "circuit_trace_network",
+			"id": "pcb_board",
 			"type": "shader",
-			"shader_key": "synth_circuit_traces",
+			"shader_key": "synth_pcb_board",
 			"animation": "static",
 			"z_order": 10,
 			"depth": 0.06,
@@ -257,9 +258,9 @@ const VARIANT_LAYER_BLUEPRINTS := {
 			"opacity": 1.0,
 		},
 		{
-			"id": "flowing_data_stream",
+			"id": "fiber_traffic",
 			"type": "shader",
-			"shader_key": "synth_data_stream",
+			"shader_key": "synth_fiber_traffic",
 			"animation": "static",
 			"z_order": 20,
 			"depth": 0.12,
@@ -267,9 +268,9 @@ const VARIANT_LAYER_BLUEPRINTS := {
 			"opacity": 1.0,
 		},
 		{
-			"id": "energy_pulse",
+			"id": "fiber_deep",
 			"type": "shader",
-			"shader_key": "synth_energy_pulse",
+			"shader_key": "synth_fiber_deep",
 			"animation": "static",
 			"z_order": 30,
 			"depth": 0.18,
@@ -277,9 +278,9 @@ const VARIANT_LAYER_BLUEPRINTS := {
 			"opacity": 1.0,
 		},
 		{
-			"id": "tiny_data_nodes",
+			"id": "junction_pads",
 			"type": "texture",
-			"procedural": "synth_data_nodes",
+			"procedural": "synth_junction_pads",
 			"animation": "pulse",
 			"z_order": 40,
 			"depth": 0.22,
@@ -644,17 +645,22 @@ static func create_foil_soft_shine_material() -> ShaderMaterial:
 	return material
 
 
-static func create_synth_circuit_traces_material() -> ShaderMaterial:
-	var material := create_variant_material("synth_circuit_traces")
+static func create_synth_pcb_board_material() -> ShaderMaterial:
+	var material := create_variant_material("synth_pcb_board")
 	if material:
+		material.set_shader_parameter("board_map", _SynthTopology.get_board_texture())
 		material.set_shader_parameter("trace_strength", SYNTH_TRACE_STRENGTH)
 		material.set_shader_parameter("edge_glow", SYNTH_TRACE_EDGE_GLOW)
+		material.set_shader_parameter("junction_boost", SYNTH_JUNCTION_BOOST)
+		material.set_shader_parameter("fiber_halo", SYNTH_FIBER_HALO)
 	return material
 
 
-static func create_synth_data_stream_material() -> ShaderMaterial:
-	var material := create_variant_material("synth_data_stream")
+static func create_synth_fiber_traffic_material() -> ShaderMaterial:
+	var material := create_variant_material("synth_fiber_traffic")
 	if material:
+		material.set_shader_parameter("board_map", _SynthTopology.get_board_texture())
+		material.set_shader_parameter("flow_map", _SynthTopology.get_flow_texture())
 		material.set_shader_parameter("stream_strength", SYNTH_STREAM_STRENGTH)
 		material.set_shader_parameter(
 			"time_scale", SYNTH_STREAM_TIME_SCALE * SYNTH_MASTER_TIME_SCALE
@@ -666,13 +672,15 @@ static func create_synth_data_stream_material() -> ShaderMaterial:
 		material.set_shader_parameter("synapse_strength", SYNTH_SYNAPSE_STRENGTH)
 		material.set_shader_parameter("rainbow_strength", SYNTH_RAINBOW_STRENGTH)
 		material.set_shader_parameter("bloom_strength", SYNTH_BLOOM_STRENGTH)
+		material.set_shader_parameter("journey_count", float(_SynthTopology.get_journey_count()))
 	return material
 
 
-static func create_synth_energy_pulse_material() -> ShaderMaterial:
-	## Deep-thought / synaptic layer (blueprint id remains "energy_pulse").
-	var material := create_variant_material("synth_energy_pulse")
+static func create_synth_fiber_deep_material() -> ShaderMaterial:
+	var material := create_variant_material("synth_fiber_deep")
 	if material:
+		material.set_shader_parameter("board_map", _SynthTopology.get_board_texture())
+		material.set_shader_parameter("flow_map", _SynthTopology.get_flow_texture())
 		material.set_shader_parameter("pulse_strength", SYNTH_TRAIL_STRENGTH)
 		material.set_shader_parameter(
 			"time_scale", SYNTH_TRAIL_TIME_SCALE * SYNTH_MASTER_TIME_SCALE
@@ -684,7 +692,21 @@ static func create_synth_energy_pulse_material() -> ShaderMaterial:
 		material.set_shader_parameter("synapse_strength", SYNTH_TRAIL_SYNAPSE_STRENGTH)
 		material.set_shader_parameter("rainbow_strength", SYNTH_TRAIL_RAINBOW_STRENGTH)
 		material.set_shader_parameter("bloom_strength", SYNTH_TRAIL_BLOOM_STRENGTH)
+		material.set_shader_parameter("journey_count", float(_SynthTopology.get_journey_count()))
 	return material
+
+
+## Compat aliases for older validation / tooling names.
+static func create_synth_circuit_traces_material() -> ShaderMaterial:
+	return create_synth_pcb_board_material()
+
+
+static func create_synth_data_stream_material() -> ShaderMaterial:
+	return create_synth_fiber_traffic_material()
+
+
+static func create_synth_energy_pulse_material() -> ShaderMaterial:
+	return create_synth_fiber_deep_material()
 
 
 static func create_diamond_glow_material() -> ShaderMaterial:
@@ -1034,12 +1056,19 @@ static func _create_named_variant_shader_material(shader_key: String) -> ShaderM
 			return create_foil_rainbow_material()
 		"foil_soft_shine":
 			return create_foil_soft_shine_material()
+		"synth_pcb_board":
+			return create_synth_pcb_board_material()
+		"synth_fiber_traffic":
+			return create_synth_fiber_traffic_material()
+		"synth_fiber_deep":
+			return create_synth_fiber_deep_material()
+		# V1 keys redirect to V2 while old shader files remain unused.
 		"synth_circuit_traces":
-			return create_synth_circuit_traces_material()
+			return create_synth_pcb_board_material()
 		"synth_data_stream":
-			return create_synth_data_stream_material()
+			return create_synth_fiber_traffic_material()
 		"synth_energy_pulse":
-			return create_synth_energy_pulse_material()
+			return create_synth_fiber_deep_material()
 		_:
 			return create_variant_material(shader_key)
 
@@ -1059,8 +1088,10 @@ static func _get_procedural_variant_texture(procedural_key: String) -> Texture2D
 			texture = _build_foil_speckle_texture(FOIL_SPARKLE_DENSITY, FOIL_SPARKLE_BRIGHTNESS, 733)
 		"synth_micro_circuit":
 			texture = _build_synth_micro_circuit_texture()
+		"synth_junction_pads":
+			texture = _SynthTopology.get_pad_texture()
 		"synth_data_nodes":
-			texture = _build_synth_data_nodes_texture()
+			texture = _SynthTopology.get_pad_texture()
 		_:
 			push_warning("CardVisualLibrary: unknown procedural texture '%s'." % procedural_key)
 
@@ -1162,37 +1193,6 @@ static func vec2_like_grid(fx: float, fy: float, cells: float) -> Vector2:
 	var gx := fmod(fx * cells, 1.0)
 	var gy := fmod(fy * cells, 1.0)
 	return Vector2(gx, gy)
-
-
-static func _build_synth_data_nodes_texture() -> Texture2D:
-	## Sparse junction lights — cyan/teal emissive dots on trace crossings (ADD).
-	var size := 512
-	var noise := FastNoiseLite.new()
-	noise.seed = 331
-	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	noise.frequency = 0.42
-	noise.fractal_type = FastNoiseLite.FRACTAL_NONE
-
-	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0, 0, 0, 0))
-	for y in size:
-		for x in size:
-			var fx := float(x) / float(size)
-			var fy := float(y) / float(size)
-			var grid := vec2_like_grid(fx, fy, 11.0)
-			var junction: float = smoothstep(0.14, 0.0, grid.distance_to(Vector2(0.5, 0.5)))
-			if junction < 0.05:
-				continue
-			var n := (noise.get_noise_2d(float(x), float(y)) + 1.0) * 0.5
-			if n < SYNTH_NODE_DENSITY:
-				continue
-			var spark := pow(smoothstep(SYNTH_NODE_DENSITY, 1.0, n), 3.6) * SYNTH_NODE_BRIGHTNESS
-			if spark < 0.08:
-				continue
-			var col := Color(0.22, 0.92, 1.0, spark * junction)
-			img.set_pixel(x, y, col)
-	img.generate_mipmaps()
-	return ImageTexture.create_from_image(img)
 
 
 static func _variant_from_folder_key(folder_key: String) -> CardData.Variant:

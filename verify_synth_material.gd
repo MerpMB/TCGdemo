@@ -1,7 +1,8 @@
 extends SceneTree
-## Headless validation — production Synth material across artwork, modes, and scales.
+## Headless validation — Synth V2 material across artwork, modes, and scales.
 
 const CARD_SCENE := preload("res://scenes/Card.tscn")
+const _SynthTopology := preload("res://scripts/ui/synth_topology.gd")
 
 const ARTWORK_FIXTURES := [
 	{"id": "common_001", "label": "busy_art"},
@@ -19,10 +20,10 @@ const SCALES := [0.55, 1.0]
 
 const EXPECTED_DEPTHS := {
 	"micro_circuit_texture": 0.02,
-	"circuit_trace_network": 0.06,
-	"flowing_data_stream": 0.12,
-	"energy_pulse": 0.18,
-	"tiny_data_nodes": 0.22,
+	"pcb_board": 0.06,
+	"fiber_traffic": 0.12,
+	"fiber_deep": 0.18,
+	"junction_pads": 0.22,
 }
 
 
@@ -31,6 +32,10 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	if not _validate_topology_bake():
+		quit(1)
+		return
+
 	if not _validate_layer_blueprint():
 		quit(1)
 		return
@@ -48,10 +53,25 @@ func _run() -> void:
 					return
 
 	print(
-		"verify_synth_material: OK — %d fixtures × %d modes × %d scales"
+		"verify_synth_material: OK — Synth V2, %d fixtures × %d modes × %d scales"
 		% [ARTWORK_FIXTURES.size(), MODES.size(), SCALES.size()]
 	)
 	quit(0)
+
+
+func _validate_topology_bake() -> bool:
+	var board: Texture2D = _SynthTopology.get_board_texture()
+	var flow: Texture2D = _SynthTopology.get_flow_texture()
+	var pads: Texture2D = _SynthTopology.get_pad_texture()
+	var journeys: int = _SynthTopology.get_journey_count()
+	if board == null or flow == null or pads == null:
+		push_error("SynthTopology bake failed (missing textures).")
+		return false
+	if journeys < 20:
+		push_error("SynthTopology expected >= 20 edge→center journeys, got %d." % journeys)
+		return false
+	print("synth_topology: journeys=%d board=%s flow=%s" % [journeys, board, flow])
+	return true
 
 
 func _validate_layer_blueprint() -> bool:
@@ -81,17 +101,17 @@ func _validate_layer_blueprint() -> bool:
 			)
 			return false
 
-	if float(depths["micro_circuit_texture"]) >= float(depths["circuit_trace_network"]):
-		push_error("Micro circuit depth must be below trace network.")
+	if float(depths["micro_circuit_texture"]) >= float(depths["pcb_board"]):
+		push_error("Micro circuit depth must be below pcb board.")
 		return false
-	if float(depths["circuit_trace_network"]) >= float(depths["flowing_data_stream"]):
-		push_error("Trace network depth must be below data stream.")
+	if float(depths["pcb_board"]) >= float(depths["fiber_traffic"]):
+		push_error("PCB board depth must be below fiber traffic.")
 		return false
-	if float(depths["flowing_data_stream"]) >= float(depths["energy_pulse"]):
-		push_error("Data stream depth must be below energy pulse.")
+	if float(depths["fiber_traffic"]) >= float(depths["fiber_deep"]):
+		push_error("Fiber traffic depth must be below fiber deep.")
 		return false
-	if float(depths["energy_pulse"]) >= float(depths["tiny_data_nodes"]):
-		push_error("Energy pulse depth must be below data nodes.")
+	if float(depths["fiber_deep"]) >= float(depths["junction_pads"]):
+		push_error("Fiber deep depth must be below junction pads.")
 		return false
 
 	var idle_offset := Vector2(-CardVisualLibrary.PARALLAX_DISTANCE, 0.0)
@@ -100,35 +120,30 @@ func _validate_layer_blueprint() -> bool:
 		* float(depths["micro_circuit_texture"])
 		* float(responses["micro_circuit_texture"])
 	)
-	var trace_px := absf(
-		idle_offset.x
-		* float(depths["circuit_trace_network"])
-		* float(responses["circuit_trace_network"])
+	var board_px := absf(
+		idle_offset.x * float(depths["pcb_board"]) * float(responses["pcb_board"])
 	)
-	var stream_px := absf(
-		idle_offset.x
-		* float(depths["flowing_data_stream"])
-		* float(responses["flowing_data_stream"])
+	var traffic_px := absf(
+		idle_offset.x * float(depths["fiber_traffic"]) * float(responses["fiber_traffic"])
 	)
-	var pulse_px := absf(
-		idle_offset.x * float(depths["energy_pulse"]) * float(responses["energy_pulse"])
+	var deep_px := absf(
+		idle_offset.x * float(depths["fiber_deep"]) * float(responses["fiber_deep"])
 	)
-	var node_px := absf(
-		idle_offset.x * float(depths["tiny_data_nodes"]) * float(responses["tiny_data_nodes"])
+	var pad_px := absf(
+		idle_offset.x * float(depths["junction_pads"]) * float(responses["junction_pads"])
 	)
 	print(
-		"synth_parallax_effective: micro=%.3f trace=%.3f stream=%.3f pulse=%.3f nodes=%.3f"
-		% [micro_px, trace_px, stream_px, pulse_px, node_px]
+		"synth_parallax_effective: micro=%.3f board=%.3f traffic=%.3f deep=%.3f pads=%.3f"
+		% [micro_px, board_px, traffic_px, deep_px, pad_px]
 	)
 
-	if stream_px <= trace_px or trace_px <= micro_px:
-		push_error("Synth depth separation failed (micro < trace < stream).")
+	if traffic_px <= board_px or board_px <= micro_px:
+		push_error("Synth depth separation failed (micro < board < traffic).")
 		return false
-	if node_px > pulse_px * 1.1:
-		push_error("Data nodes should not float above the energy pulse layer.")
+	if pad_px > deep_px * 1.1:
+		push_error("Junction pads should not float above the fiber deep layer.")
 		return false
 
-	# Synth is emissive tech — motion profile differs from reflective foil.
 	var foil_layers: Array = CardVisualLibrary.get_variant_layers(CardData.Variant.FOIL)
 	var foil_max := 0.0
 	for foil_layer in foil_layers:
@@ -145,29 +160,30 @@ func _validate_layer_blueprint() -> bool:
 
 
 func _validate_packet_materials() -> bool:
-	var stream_mat := CardVisualLibrary.create_synth_data_stream_material()
-	var trail_mat := CardVisualLibrary.create_synth_energy_pulse_material()
-	if stream_mat == null or trail_mat == null:
-		push_error("Synth packet materials failed to build.")
+	var board_mat := CardVisualLibrary.create_synth_pcb_board_material()
+	var traffic_mat := CardVisualLibrary.create_synth_fiber_traffic_material()
+	var deep_mat := CardVisualLibrary.create_synth_fiber_deep_material()
+	if board_mat == null or traffic_mat == null or deep_mat == null:
+		push_error("Synth V2 materials failed to build.")
 		return false
 
-	# Primary stream must expose packet uniforms (not a heartbeat interval).
-	if stream_mat.get_shader_parameter("packet_speed") == null:
-		push_error("Data stream missing packet_speed.")
+	if board_mat.get_shader_parameter("board_map") == null:
+		push_error("PCB board missing board_map.")
 		return false
-	if stream_mat.get_shader_parameter("trail_length") == null:
-		push_error("Data stream missing trail_length.")
+	if traffic_mat.get_shader_parameter("flow_map") == null:
+		push_error("Fiber traffic missing flow_map.")
+		return false
+	if traffic_mat.get_shader_parameter("packet_speed") == null:
+		push_error("Fiber traffic missing packet_speed.")
+		return false
+	if deep_mat.get_shader_parameter("packet_speed") == null:
+		push_error("Fiber deep missing packet_speed.")
 		return false
 
-	# Secondary layer must also be packet traffic, not a shared pulse clock.
-	if trail_mat.get_shader_parameter("packet_speed") == null:
-		push_error("Secondary trail layer missing packet_speed.")
-		return false
-
-	var stream_speed := float(stream_mat.get_shader_parameter("packet_speed"))
-	var trail_speed := float(trail_mat.get_shader_parameter("packet_speed"))
-	if is_equal_approx(stream_speed, trail_speed):
-		push_error("Primary and secondary packet speeds must differ (independent traffic).")
+	var stream_speed := float(traffic_mat.get_shader_parameter("packet_speed"))
+	var deep_speed := float(deep_mat.get_shader_parameter("packet_speed"))
+	if is_equal_approx(stream_speed, deep_speed):
+		push_error("Primary and deep packet speeds must differ (independent traffic).")
 		return false
 
 	return true
@@ -204,7 +220,6 @@ func _validate_spawn(card_id: String, label: String, mode: CardScene.DisplayMode
 		scene.queue_free()
 		return false
 
-	# Synth must not remap art — artwork stays readable via generic renderer only.
 	var art := scene.get_node_or_null("%ArtTexture") as TextureRect
 	if art != null and art.material != null:
 		push_error("[%s mode=%d scale=%.2f] Synth must not apply art material overlay." % [label, mode, card_scale])
