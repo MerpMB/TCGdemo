@@ -136,36 +136,38 @@ const SYNTH_MASTER_TIME_SCALE := 1.0
 const SYNTH_MICRO_CIRCUIT_STRENGTH := 0.028
 const SYNTH_MICRO_CIRCUIT_FREQUENCY := 2.4
 
-## 2. Circuit Trace Network — static idle neural PCB (ADD). Keep faint.
-const SYNTH_TRACE_STRENGTH := 0.24
-const SYNTH_TRACE_EDGE_GLOW := 0.015
+## 2. Circuit Trace Network — nearly invisible idle cyan/teal PCB.
+const SYNTH_TRACE_STRENGTH := 0.07
+const SYNTH_TRACE_EDGE_GLOW := 0.008
 
-## 3. Primary signals — few large iridescent waves (ADD).
-const SYNTH_STREAM_STRENGTH := 0.62
+## 3. Primary signals — sparse elegant long-route waves (brightness locked).
+const SYNTH_STREAM_STRENGTH := 1.15
 const SYNTH_STREAM_TIME_SCALE := 0.48
 const SYNTH_PACKET_SPEED := 0.78
-const SYNTH_PACKET_SIZE := 0.055
-const SYNTH_BODY_LENGTH := 0.18
-const SYNTH_TRAIL_LENGTH := 0.28
-const SYNTH_SYNAPSE_STRENGTH := 0.55
-const SYNTH_RAINBOW_STRENGTH := 0.78
+const SYNTH_PACKET_SIZE := 0.09
+const SYNTH_BODY_LENGTH := 0.38
+const SYNTH_TRAIL_LENGTH := 0.55
+const SYNTH_SYNAPSE_STRENGTH := 1.20
+const SYNTH_RAINBOW_STRENGTH := 0.88
+const SYNTH_BLOOM_STRENGTH := 0.72
 
-## 4. Deep thoughts — rare secondary waves (ADD).
-const SYNTH_TRAIL_STRENGTH := 0.28
+## 4. Deep thoughts — very rare long-route waves.
+const SYNTH_TRAIL_STRENGTH := 0.55
 const SYNTH_TRAIL_TIME_SCALE := 0.26
 const SYNTH_TRAIL_PACKET_SPEED := 0.48
-const SYNTH_TRAIL_PACKET_SIZE := 0.06
-const SYNTH_TRAIL_BODY_LENGTH := 0.22
-const SYNTH_TRAIL_LENGTH_SECONDARY := 0.34
-const SYNTH_TRAIL_SYNAPSE_STRENGTH := 0.40
-const SYNTH_TRAIL_RAINBOW_STRENGTH := 0.70
+const SYNTH_TRAIL_PACKET_SIZE := 0.095
+const SYNTH_TRAIL_BODY_LENGTH := 0.42
+const SYNTH_TRAIL_LENGTH_SECONDARY := 0.62
+const SYNTH_TRAIL_SYNAPSE_STRENGTH := 0.95
+const SYNTH_TRAIL_RAINBOW_STRENGTH := 0.82
+const SYNTH_TRAIL_BLOOM_STRENGTH := 0.55
 
-## 5. Tiny Data Nodes — sparse standby junctions (ADD). Keep subtle.
-const SYNTH_NODE_OPACITY := 0.08
-const SYNTH_NODE_DENSITY := 0.992
-const SYNTH_NODE_PULSE_SPEED := 0.08
+## 5. Tiny Data Nodes — barely-there standby junctions.
+const SYNTH_NODE_OPACITY := 0.05
+const SYNTH_NODE_DENSITY := 0.994
+const SYNTH_NODE_PULSE_SPEED := 0.06
 const SYNTH_NODE_SIZE := 0.92
-const SYNTH_NODE_BRIGHTNESS := 0.35
+const SYNTH_NODE_BRIGHTNESS := 0.28
 
 ## Per-variant layer blueprints — renderer consumes materialized VariantLayer instances only.
 ## Layer type keys: texture, shader, color, particles
@@ -663,6 +665,7 @@ static func create_synth_data_stream_material() -> ShaderMaterial:
 		material.set_shader_parameter("trail_length", SYNTH_TRAIL_LENGTH)
 		material.set_shader_parameter("synapse_strength", SYNTH_SYNAPSE_STRENGTH)
 		material.set_shader_parameter("rainbow_strength", SYNTH_RAINBOW_STRENGTH)
+		material.set_shader_parameter("bloom_strength", SYNTH_BLOOM_STRENGTH)
 	return material
 
 
@@ -680,6 +683,7 @@ static func create_synth_energy_pulse_material() -> ShaderMaterial:
 		material.set_shader_parameter("trail_length", SYNTH_TRAIL_LENGTH_SECONDARY)
 		material.set_shader_parameter("synapse_strength", SYNTH_TRAIL_SYNAPSE_STRENGTH)
 		material.set_shader_parameter("rainbow_strength", SYNTH_TRAIL_RAINBOW_STRENGTH)
+		material.set_shader_parameter("bloom_strength", SYNTH_TRAIL_BLOOM_STRENGTH)
 	return material
 
 
