@@ -130,27 +130,30 @@ script = ExtResource("2_menubtn")
 [node name="SkipSafeArea" type="MarginContainer" parent="."]
 z_index = 10
 layout_mode = 1
-anchors_preset = 15
+anchors_preset = 12
+anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_top = -92.0
 grow_horizontal = 2
-grow_vertical = 2
+grow_vertical = 0
 mouse_filter = 2
 theme_override_constants/margin_left = 20
-theme_override_constants/margin_top = 32
+theme_override_constants/margin_top = 0
 theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 40
 
 [node name="SkipRow" type="HBoxContainer" parent="SkipSafeArea"]
 layout_mode = 2
 mouse_filter = 2
-alignment = 2
+alignment = 1
 
 [node name="SkipButton" type="Button" parent="SkipSafeArea/SkipRow"]
 unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(96, 52)
 layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 0
 mouse_filter = 0
 theme_override_font_sizes/font_size = 17

@@ -293,38 +293,44 @@ const VARIANT_LAYER_BLUEPRINTS := {
 	],
 	CardData.Variant.DIAMOND: [
 		{
-			"id": "crystal_pattern",
-			"type": "texture",
-			"slot": "overlay",
+			"id": "crystal_plate",
+			"type": "shader",
+			"shader_key": "diamond_facets",
 			"animation": "static",
 			"z_order": 0,
-			"parallax_strength": VARIANT_PARALLAX_OVERLAY,
+			"depth": 0.05,
+			"material_response": 0.60,
+			"opacity": 1.0,
 		},
 		{
-			"id": "rainbow_refraction",
-			"type": "texture",
-			"slot": "shine",
-			"animation": "scroll",
+			"id": "facet_specular",
+			"type": "shader",
+			"shader_key": "diamond_reflection",
+			"animation": "static",
 			"z_order": 10,
-			"opacity": 0.55,
-			"scroll_speed": 28.0,
-			"scroll_direction": Vector2(1.0, 0.0),
-			"parallax_strength": VARIANT_PARALLAX_SHINE,
+			"depth": 0.12,
+			"material_response": 0.90,
+			"opacity": 1.0,
 		},
 		{
-			"id": "shimmer",
-			"type": "texture",
-			"slot": "shimmer",
-			"animation": "shimmer",
+			"id": "dispersion_peaks",
+			"type": "shader",
+			"shader_key": "diamond_dispersion",
+			"animation": "static",
 			"z_order": 20,
-			"opacity": 0.6,
+			"depth": 0.16,
+			"material_response": 0.70,
+			"opacity": 1.0,
 		},
 		{
-			"id": "sparkle",
-			"type": "texture",
-			"slot": "sparkle",
+			"id": "optical_sparkle",
+			"type": "shader",
+			"shader_key": "diamond_sparkle",
 			"animation": "static",
 			"z_order": 30,
+			"depth": 0.22,
+			"material_response": 0.40,
+			"opacity": 1.0,
 		},
 	],
 	CardData.Variant.NEGATIVE: [
@@ -552,9 +558,41 @@ static func validate_card_assets(card: CardData) -> void:
 
 
 ## Variant FX tuning — shader uniforms; idle motion uses TIME (no per-card tweens).
-const DIAMOND_ART_MODULATE := Color(1.03, 1.06, 1.12, 1.0)
-const DIAMOND_GLOW_INTENSITY := 0.18
-const DIAMOND_SPARKLE_INTENSITY := 0.3
+# ---------------------------------------------------------------------------
+# Diamond V1 — 7th Edition confetti / starfoil laminate (MTG diamond foil ref).
+# Dense irregular flakes; cyan→magenta wash; boundaries from color/value only.
+# Hierarchy: confetti film → lit flake boost → chroma peaks → star glints.
+# ---------------------------------------------------------------------------
+
+## Optical richness (jewelry-display lighting) — hotspots only, calm body.
+const DIAMOND_PLATE_STRENGTH := 0.42
+const DIAMOND_FRESNEL_STRENGTH := 0.08
+const DIAMOND_CLARITY_VEIL := 0.0
+const DIAMOND_SEAM_STRENGTH := 0.0
+const DIAMOND_PLATE_IRIDESCENCE := 0.92
+
+const DIAMOND_REFLECTION_STRENGTH := 0.88
+const DIAMOND_BODY_STRENGTH := 0.28
+const DIAMOND_RIM_STRENGTH := 0.06
+const DIAMOND_SPECULAR_IRIDESCENCE := 1.0
+const DIAMOND_SPECULAR_WHITE := 1.15
+const DIAMOND_FIRE_STRENGTH := 0.55
+const DIAMOND_LIGHT_DIR := Vector2(0.35, -0.75)
+const DIAMOND_LIGHT_TIME_SCALE := 0.04
+
+const DIAMOND_WARP_STRENGTH := 0.0
+const DIAMOND_CLARITY := 1.0
+const DIAMOND_COOL_LIFT := 0.0
+const DIAMOND_EDGE_SHARPEN := 0.0
+
+const DIAMOND_DISPERSION_STRENGTH := 0.72
+const DIAMOND_DISPERSION_PEAK_GATE := 0.48
+const DIAMOND_DISPERSION_SATURATION := 1.35
+const DIAMOND_DISPERSION_TIME_SCALE := 0.035
+
+const DIAMOND_SPARKLE_STRENGTH := 0.42
+const DIAMOND_SPARKLE_TIME_SCALE := 0.22
+const DIAMOND_SPARKLE_SIZE := 0.007
 
 const NEGATIVE_TIME_SCALE := 0.28
 const NEGATIVE_EDGE_STRENGTH := 0.14
@@ -709,20 +747,68 @@ static func create_synth_energy_pulse_material() -> ShaderMaterial:
 	return create_synth_fiber_deep_material()
 
 
-static func create_diamond_glow_material() -> ShaderMaterial:
-	var material := create_variant_material("diamond_glow")
+static func create_diamond_facets_material() -> ShaderMaterial:
+	var material := create_variant_material("diamond_facets")
 	if material:
-		material.set_shader_parameter("intensity", DIAMOND_GLOW_INTENSITY)
-		material.set_shader_parameter("time_scale", 1.1)
+		material.set_shader_parameter("plate_strength", DIAMOND_PLATE_STRENGTH)
+		material.set_shader_parameter("fresnel_strength", DIAMOND_FRESNEL_STRENGTH)
+		material.set_shader_parameter("clarity_veil", DIAMOND_CLARITY_VEIL)
+		material.set_shader_parameter("seam_strength", DIAMOND_SEAM_STRENGTH)
+		material.set_shader_parameter("iridescence", DIAMOND_PLATE_IRIDESCENCE)
+		material.set_shader_parameter("time_scale", DIAMOND_LIGHT_TIME_SCALE)
+		material.set_shader_parameter("light_dir", DIAMOND_LIGHT_DIR)
+	return material
+
+
+static func create_diamond_reflection_material() -> ShaderMaterial:
+	var material := create_variant_material("diamond_reflection")
+	if material:
+		material.set_shader_parameter("reflection_strength", DIAMOND_REFLECTION_STRENGTH)
+		material.set_shader_parameter("body_strength", DIAMOND_BODY_STRENGTH)
+		material.set_shader_parameter("rim_strength", DIAMOND_RIM_STRENGTH)
+		material.set_shader_parameter("iridescence", DIAMOND_SPECULAR_IRIDESCENCE)
+		material.set_shader_parameter("specular_white", DIAMOND_SPECULAR_WHITE)
+		material.set_shader_parameter("fire_strength", DIAMOND_FIRE_STRENGTH)
+		material.set_shader_parameter("time_scale", DIAMOND_LIGHT_TIME_SCALE)
+		material.set_shader_parameter("light_dir", DIAMOND_LIGHT_DIR)
+	return material
+
+
+static func create_diamond_refraction_material() -> ShaderMaterial:
+	## Unused in V1 look (no art warp). Kept for API compatibility.
+	var material := create_variant_material("diamond_refraction")
+	if material:
+		material.set_shader_parameter("warp_strength", DIAMOND_WARP_STRENGTH)
+		material.set_shader_parameter("clarity", DIAMOND_CLARITY)
+		material.set_shader_parameter("cool_lift", DIAMOND_COOL_LIFT)
+		material.set_shader_parameter("edge_sharpen", DIAMOND_EDGE_SHARPEN)
+	return material
+
+
+static func create_diamond_dispersion_material() -> ShaderMaterial:
+	var material := create_variant_material("diamond_dispersion")
+	if material:
+		material.set_shader_parameter("dispersion_strength", DIAMOND_DISPERSION_STRENGTH)
+		material.set_shader_parameter("peak_gate", DIAMOND_DISPERSION_PEAK_GATE)
+		material.set_shader_parameter("saturation", DIAMOND_DISPERSION_SATURATION)
+		material.set_shader_parameter("time_scale", DIAMOND_DISPERSION_TIME_SCALE)
+		material.set_shader_parameter("light_dir", DIAMOND_LIGHT_DIR)
 	return material
 
 
 static func create_diamond_sparkle_material() -> ShaderMaterial:
 	var material := create_variant_material("diamond_sparkle")
 	if material:
-		material.set_shader_parameter("intensity", DIAMOND_SPARKLE_INTENSITY)
-		material.set_shader_parameter("time_scale", 1.35)
+		material.set_shader_parameter("sparkle_strength", DIAMOND_SPARKLE_STRENGTH)
+		material.set_shader_parameter("time_scale", DIAMOND_SPARKLE_TIME_SCALE)
+		material.set_shader_parameter("sparkle_size", DIAMOND_SPARKLE_SIZE)
+		material.set_shader_parameter("light_dir", DIAMOND_LIGHT_DIR)
 	return material
+
+
+## Legacy aliases — retired glow layer maps to internal reflection.
+static func create_diamond_glow_material() -> ShaderMaterial:
+	return create_diamond_reflection_material()
 
 
 static func create_negative_invert_material() -> ShaderMaterial:
@@ -1069,6 +1155,16 @@ static func _create_named_variant_shader_material(shader_key: String) -> ShaderM
 			return create_synth_fiber_traffic_material()
 		"synth_energy_pulse":
 			return create_synth_fiber_deep_material()
+		"diamond_facets":
+			return create_diamond_facets_material()
+		"diamond_reflection":
+			return create_diamond_reflection_material()
+		"diamond_dispersion":
+			return create_diamond_dispersion_material()
+		"diamond_sparkle":
+			return create_diamond_sparkle_material()
+		"diamond_glow":
+			return create_diamond_reflection_material()
 		_:
 			return create_variant_material(shader_key)
 

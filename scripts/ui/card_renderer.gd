@@ -162,13 +162,11 @@ func _apply_negative_overlay() -> void:
 
 
 func _apply_diamond_overlay() -> void:
-	art_texture.modulate = CardVisualLibrary.DIAMOND_ART_MODULATE
-	diamond_glow.material = CardVisualLibrary.create_diamond_glow_material()
-	diamond_glow.color = Color(1.0, 1.0, 1.0, 1.0)
-	diamond_glow.visible = true
-	diamond_icon.material = CardVisualLibrary.create_diamond_sparkle_material()
-	diamond_icon.color = Color(1.0, 1.0, 1.0, 1.0)
-	diamond_icon.visible = true
+	## Glass shards are VariantRenderer overlays only — artwork stays undistorted.
+	art_texture.material = null
+	art_texture.modulate = Color.WHITE
+	diamond_glow.visible = false
+	diamond_icon.visible = false
 
 
 func reset_variant_overlays() -> void:
