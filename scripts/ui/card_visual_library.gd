@@ -367,11 +367,6 @@ static func _build_warmup_materials() -> Array[ShaderMaterial]:
 		create_synth_pcb_board_material(),
 		create_synth_fiber_traffic_material(),
 		create_synth_fiber_deep_material(),
-		create_diamond_facets_material(),
-		create_diamond_reflection_material(),
-		create_diamond_refraction_material(),
-		create_diamond_dispersion_material(),
-		create_diamond_sparkle_material(),
 		create_negative_invert_material(),
 		create_negative_edge_material(),
 	]
@@ -471,29 +466,7 @@ static func create_synth_energy_pulse_material() -> ShaderMaterial:
 	return create_synth_fiber_deep_material()
 
 
-static func create_diamond_facets_material() -> ShaderMaterial:
-	return _DiamondMaterials.create_facets_material()
-
-
-static func create_diamond_reflection_material() -> ShaderMaterial:
-	return _DiamondMaterials.create_reflection_material()
-
-
-static func create_diamond_refraction_material() -> ShaderMaterial:
-	return _DiamondMaterials.create_refraction_material()
-
-
-static func create_diamond_dispersion_material() -> ShaderMaterial:
-	return _DiamondMaterials.create_dispersion_material()
-
-
-static func create_diamond_sparkle_material() -> ShaderMaterial:
-	return _DiamondMaterials.create_sparkle_material()
-
-
-## Legacy aliases — retired glow layer maps to internal reflection.
-static func create_diamond_glow_material() -> ShaderMaterial:
-	return create_diamond_reflection_material()
+## Diamond uses only the static Photoshop overlay texture.
 
 
 static func create_negative_invert_material() -> ShaderMaterial:
@@ -818,9 +791,6 @@ static func _create_named_variant_shader_material(shader_key: String) -> ShaderM
 	if material:
 		return material
 	material = _SynthMaterials.create_named_shader_material(shader_key)
-	if material:
-		return material
-	material = _DiamondMaterials.create_named_shader_material(shader_key)
 	if material:
 		return material
 	material = _NegativeMaterials.create_named_shader_material(shader_key)

@@ -164,16 +164,16 @@ func _apply_negative_overlay() -> void:
 
 
 func _apply_diamond_overlay() -> void:
-	## Glass shards are VariantRenderer overlays only — artwork stays undistorted.
-	art_texture.material = null
-	art_texture.modulate = Color.WHITE
-	diamond_glow.visible = false
-	diamond_icon.visible = false
-
+	## The PSD overlay is materialized by the generic VariantRenderer.
+	pass
 
 func reset_variant_overlays() -> void:
+	card_body.material = null
 	art_texture.material = null
 	art_texture.modulate = Color.WHITE
+	frame_texture.material = null
+	frame_panel.material = null
+
 	negative_overlay.material = null
 	negative_overlay.color = Color(0.02, 0.02, 0.04, 0.55)
 	negative_overlay.visible = false
