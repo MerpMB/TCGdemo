@@ -11,6 +11,7 @@ func _run() -> void:
 	var inventory_manager := root.get_node("PackInventoryManager")
 	var pack_database := root.get_node("PackDatabase")
 	var open_pack_service := root.get_node("OpenPackService")
+	open_pack_service.call("set_persistence_callback_for_testing", Callable(self, "_save_success"))
 
 	collection_manager.call("reset_runtime_data")
 	inventory_manager.call("reset_runtime_data")
@@ -68,7 +69,11 @@ func _run() -> void:
 	quit(0)
 
 
-func _fail_persistence() -> bool:
+func _save_success(_inventory_counts: Dictionary) -> bool:
+	return true
+
+
+func _fail_persistence(_inventory_counts: Dictionary) -> bool:
 	return false
 
 

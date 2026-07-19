@@ -38,6 +38,65 @@ func remove_card_by_instance(instance_id: String) -> void:
 			return
 
 
+func export_save_data() -> Dictionary:
+	var cards: Array[Dictionary] = []
+	for card in _collection:
+		cards.append({
+			"card_id": card.card_id,
+			"variant": int(card.variant),
+			"instance_id": card.instance_id,
+		})
+
+	var deck_instance_ids: PackedStringArray = []
+	for card in _deck:
+		deck_instance_ids.append(card.instance_id)
+
+	return {
+		"cards": cards,
+		"deck_instance_ids": deck_instance_ids,
+		"next_instance_id": _next_instance_id,
+	}
+
+
+func hydrate_from_save_data(data: Dictionary, database: Node) -> bool:
+	var restored_collection: Array[CardData] = []
+	var seen_instance_ids: Dictionary = {}
+	for entry in data.get("cards", []):
+		if not entry is Dictionary:
+			return false
+		var card_id := String(entry.get("card_id", ""))
+		var instance_id := String(entry.get("instance_id", ""))
+		var variant := int(entry.get("variant", -1))
+		if card_id.is_empty() or instance_id.is_empty() or seen_instance_ids.has(instance_id):
+			return false
+		if variant < CardData.Variant.NORMAL or variant > CardData.Variant.SYNTH:
+			return false
+		var template := database.get_card(card_id) as CardData
+		if template == null:
+			return false
+		var owned := template.duplicate_card()
+		owned.variant = variant as CardData.Variant
+		owned.instance_id = instance_id
+		restored_collection.append(owned)
+		seen_instance_ids[instance_id] = true
+
+	var restored_deck: Array[CardData] = []
+	for instance_id_value in data.get("deck_instance_ids", []):
+		var instance_id := String(instance_id_value)
+		if instance_id.is_empty():
+			return false
+		var owned := _find_card_in_array(restored_collection, instance_id)
+		if owned == null or restored_deck.has(owned):
+			return false
+		restored_deck.append(owned)
+
+	_collection = restored_collection
+	_deck = restored_deck
+	_next_instance_id = maxi(int(data.get("next_instance_id", 1)), 1)
+	collection_changed.emit()
+	deck_changed.emit()
+	return true
+
 func create_state_snapshot() -> Dictionary:
 	var collection_copies: Array[CardData] = []
 	for card in _collection:
@@ -130,6 +189,12 @@ func reset_runtime_data() -> void:
 	collection_changed.emit()
 	deck_changed.emit()
 
+
+func _find_card_in_array(cards: Array[CardData], instance_id: String) -> CardData:
+	for card in cards:
+		if card.instance_id == instance_id:
+			return card
+	return null
 
 func _copy_card_with_instance(card: CardData) -> CardData:
 	var copy := card.duplicate_card()

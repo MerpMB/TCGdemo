@@ -11,7 +11,7 @@ var _persistence_callback: Callable
 
 
 func _ready() -> void:
-	_persistence_callback = Callable(get_node("/root/SaveManager"), "save_game")
+	_persistence_callback = Callable(get_node("/root/SaveManager"), "save_runtime_state")
 
 
 func open_pack(pack_id: String, rng: RandomNumberGenerator = null) -> Dictionary:
@@ -37,7 +37,10 @@ func open_pack(pack_id: String, rng: RandomNumberGenerator = null) -> Dictionary
 	var inventory_snapshot := PackInventoryManager.get_owned_counts()
 	CollectionManager.add_cards(cards)
 
-	if not _persist_game():
+	var prospective_inventory := inventory_snapshot.duplicate()
+	prospective_inventory[pack_id] = int(prospective_inventory.get(pack_id, 0)) - 1
+
+	if not _persist_game(prospective_inventory):
 		_rollback(collection_snapshot, inventory_snapshot)
 		return OpenPackResultData.failure(
 			"persistence_failed", "Your pack could not be saved. Nothing was changed.", pack_id
@@ -56,10 +59,10 @@ func set_persistence_callback_for_testing(callback: Callable) -> void:
 	_persistence_callback = callback
 
 
-func _persist_game() -> bool:
+func _persist_game(inventory_counts: Dictionary) -> bool:
 	if not _persistence_callback.is_valid():
 		return false
-	return _persistence_callback.call() == true
+	return _persistence_callback.call(inventory_counts) == true
 
 
 func _rollback(collection_snapshot: Dictionary, inventory_snapshot: Dictionary) -> void:
