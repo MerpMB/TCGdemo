@@ -5,9 +5,9 @@ const CARD_SCENE := preload("res://scenes/Card.tscn")
 const _SynthTopology := preload("res://scripts/ui/synth_topology.gd")
 
 const ARTWORK_FIXTURES := [
-	{"id": "common_001", "label": "busy_art"},
-	{"id": "legendary_001", "label": "bright_art"},
-	{"id": "common_006", "label": "minimal_art"},
+	{"id": "mage_rookie_fire_mage", "label": "busy_art"},
+	{"id": "mage_goddess_of_the_elements", "label": "bright_art"},
+	{"id": "mage_rookie_ice_mage", "label": "minimal_art"},
 ]
 
 const MODES := [
@@ -190,7 +190,7 @@ func _validate_packet_materials() -> bool:
 
 
 func _validate_spawn(card_id: String, label: String, mode: CardScene.DisplayMode, card_scale: float) -> bool:
-	var path := "res://resources/cards/core/%s.tres" % card_id
+	var path := "res://resources/cards/mage/%s.tres" % card_id
 	var template := load(path) as CardData
 	if template == null:
 		push_error("Fixture card missing: %s" % path)

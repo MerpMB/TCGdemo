@@ -26,7 +26,7 @@ func _ready() -> void:
 
 
 func _on_generate_pack_pressed() -> void:
-	var dev_pack := PackDatabase.get_pack("developer_pack")
+	var dev_pack := PackDatabase.get_pack(GameManager.selected_pack_id)
 	if dev_pack:
 		GameManager.set_selected_pack(dev_pack.pack_id)
 	elif GameManager.selected_pack_id.is_empty():
@@ -56,7 +56,7 @@ func _give_card_of_rarity(rarity: CardData.Rarity) -> void:
 
 
 func _get_dev_pack_config() -> PackConfig:
-	var dev_pack := PackDatabase.get_pack("developer_pack")
+	var dev_pack := PackDatabase.get_pack(GameManager.selected_pack_id)
 	if dev_pack:
 		return dev_pack
 	var all_packs := PackDatabase.get_all_packs()

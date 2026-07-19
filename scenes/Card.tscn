@@ -1,6 +1,19 @@
-[gd_scene load_steps=2 format=3 uid="uid://bqx8cardscene01"]
+[gd_scene load_steps=6 format=3 uid="uid://bqx8cardscene01"]
 
 [ext_resource type="Script" path="res://scripts/ui/card_scene.gd" id="1_card"]
+[ext_resource type="Shader" path="res://assets/shaders/card_rounded_clip.gdshader" id="2_round_clip"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_body_round_clip"]
+resource_local_to_scene = true
+shader = ExtResource("2_round_clip")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_back_round_clip"]
+resource_local_to_scene = true
+shader = ExtResource("2_round_clip")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_art_round_clip"]
+resource_local_to_scene = true
+shader = ExtResource("2_round_clip")
 
 [node name="Card" type="Control"]
 custom_minimum_size = Vector2(140, 200)
@@ -8,6 +21,10 @@ layout_mode = 3
 anchors_preset = 0
 clip_contents = true
 script = ExtResource("1_card")
+
+
+
+
 
 [node name="FlipPivot" type="Control" parent="."]
 unique_name_in_owner = true
@@ -31,6 +48,7 @@ mouse_filter = 2
 color = Color(0.18, 0.72, 0.32, 0)
 
 [node name="CardBody" type="ColorRect" parent="FlipPivot"]
+material = SubResource("ShaderMaterial_body_round_clip")
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -53,6 +71,7 @@ mouse_filter = 2
 clip_contents = true
 
 [node name="BackTexture" type="TextureRect" parent="FlipPivot/BackFace"]
+material = SubResource("ShaderMaterial_back_round_clip")
 unique_name_in_owner = true
 modulate = Color(1, 1, 1, 1)
 self_modulate = Color(1, 1, 1, 1)
@@ -89,6 +108,7 @@ grow_vertical = 2
 mouse_filter = 2
 
 [node name="ArtTexture" type="TextureRect" parent="FlipPivot/FrontFace"]
+material = SubResource("ShaderMaterial_art_round_clip")
 unique_name_in_owner = true
 visible = false
 modulate = Color(1, 1, 1, 1)

@@ -24,9 +24,9 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	var template := load("res://resources/cards/core/common_001.tres") as CardData
+	var template := load("res://resources/cards/mage/mage_rookie_fire_mage.tres") as CardData
 	if template == null:
-		push_error("verify_variant_visuals: common_001 missing.")
+		push_error("verify_variant_visuals: mage_rookie_fire_mage missing.")
 		quit(1)
 		return
 

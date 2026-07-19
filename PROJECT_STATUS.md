@@ -62,7 +62,8 @@ The framework prototype is fully playable on mobile-first portrait layouts.
 | Asset-based card backs (`assets/backs/`) | ✓ |
 | Production asset pipeline (`docs/ASSET_PIPELINE.md`) | ✓ |
 | Variant Material System (Foil production stack) | ✓ |
-| Gold Variant Material (production stack) | ✓ |
+| Gold Variant Material (production stack) | — (enum is `SYNTH`; gold shaders unused) |
+| Synth Variant Material (production stack) | ✓ |
 | Variant shader polish (Diamond, Negative legacy) | ✓ |
 | Duplicate stacking (gallery view-only) | ✓ |
 | Owned-count badges (`×N`) | ✓ |
@@ -72,11 +73,11 @@ The framework prototype is fully playable on mobile-first portrait layouts.
 | Pack pool isolation (`allowed_sets`, tags) | ✓ |
 | Deck builder (framework feature, not in main loop) | ✓ |
 | Developer panel (F1) | ✓ |
-| Save persistence | ✗ placeholder only |
-| Pack selection UI on main menu | ✗ defaults to `starter_pack` |
+| Save persistence | ✓ versioned `SaveManager` (`user://tcg_save.json`) |
+| Pack selection UI | ✓ Pack Hub (four class packs) |
 | Collection search / filters | ✗ hook exists, not wired |
 
-**Content loaded today:** 44 cards · 4 pack types
+**Content loaded today:** 53 cards · 4 class packs (Knight / Mage / Priest / Rogue)
 
 ---
 
@@ -86,13 +87,14 @@ Gameplay, generation, and rendering are strictly separated.
 
 ```
 Managers (autoload)
-    GameManager · CardDatabase · PackDatabase · CollectionManager · SaveManager
+    GameManager · CardDatabase · PackDatabase · CollectionManager
+    PackInventoryManager · OpenPackService · SaveManager
 
 Logic (RefCounted / systems)
     PackGenerator  →  queries  →  CardDatabase.get_cards_for_pack()
 
 UI orchestrators
-    PackOpening · Collection · CardViewer · MainMenu
+    PackHub · PackOpening · Collection · CardViewer · CardInspection · MainMenu
 ```
 
 ### CardScene (orchestrator only)
@@ -238,7 +240,7 @@ Variants defined in `CardData.Variant`. Foil uses `RenderLayerContainer`; others
 | **Negative** | `NEGATIVE` | Inverted artwork + subtle chromatic edge pulse (legacy) |
 | **Alternate Art** | `ALTERNATIVE_ART` | No overlay FX — artwork is the variant |
 | **Diamond** | `DIAMOND` | Cool white/blue crystal glow + point twinkles (legacy) |
-| **Gold** | `GOLD` | Production layered material (brushed grain, warm reflection, mirror shine, flakes, specular) |
+| **Synth** | `SYNTH` | Production layered PCB / fiber material (`SynthMaterials`) |
 
 **Future variants:** author via `CardVisualLibrary.VARIANT_LAYER_BLUEPRINTS`, not renderer changes.
 
@@ -250,11 +252,10 @@ Four `PackConfig` resources in `resources/packs/`:
 
 | Pack ID | Display Name | Pool filter |
 |---------|--------------|-------------|
-| `starter_pack` | Starter Pack | `allowed_sets`: Core Set · excludes event/limited/developer/debug tags |
-| `premium_pack` | Premium Pack | Core Set · higher rarity weights |
-| `event_pack` | Event Pack | `allowed_sets`: Event Set · `allowed_tags`: event |
-| `developer_pack` | Developer Pack | `allowed_sets`: Developer Set · `allowed_tags`: developer |
-
+| `knight_pack` | Knight Class Pack | `allowed_sets`: Knight Deck |
+| `mage_pack` | Mage Class Pack | `allowed_sets`: Mage Deck |
+| `priest_pack` | Priest Class Pack | `allowed_sets`: Priest Deck |
+| `rogue_pack` | Rogue Class Pack | `allowed_sets`: Rogue Deck |
 **Generation pipeline**
 
 ```
@@ -271,7 +272,7 @@ PackGenerator                       ← rarity_weights + variant_weights unchang
 
 Empty filter arrays mean “no restriction” on that axis. `PackGenerator` never inspects sets or tags directly.
 
-**Note:** Main menu currently selects `starter_pack` only. Other packs are reachable via Developer Panel or `GameManager.set_selected_pack()`.
+**Note:** Pack Hub exposes all four class packs; claim the currently selected pack before opening it.
 
 ---
 
@@ -310,11 +311,10 @@ Active GitHub issues only ([MerpMB/TCGdemo](https://github.com/MerpMB/TCGdemo)):
 
 Recommended order for next development sessions:
 
-1. **Content Pipeline** — more cards, sets, artwork, pack definitions (Issue #9)
-2. **Save System** — implement `SaveManager` persistence (Phase 6)
-3. **Collection Filters** — wire `_apply_view_filters()` in collection gallery
-4. **Pack Selection UI** — expose pack choice on main menu
-5. **PNG variant/glow overlays** — optional art drops into `assets/variants/` and `assets/glows/`
+1. **Content Pipeline** — more cards, sets, artwork, pack definitions
+2. **Collection Filters** — wire `_apply_view_filters()` in collection gallery
+3. **Warmup staging** — defer rare variant shader compile for faster boot (#19)
+4. **Pack pool validation** — startup checks that every weight key has pool cards (#21)
 
 ---
 
@@ -324,8 +324,7 @@ Real remaining debt only — not shipped work.
 
 | Item | Impact |
 |------|--------|
-| `SaveManager` is stub-only | Collection resets every session |
-| No pack picker on main menu | Players cannot choose Premium/Event packs in normal flow |
+| No pack purchase / shop currency | Players claim packs via Pack Hub for now |
 | Variant/glow PNG folders empty | Shaders used; drop `overlay.png` / `glow.png` when art is ready |
 | 31 of 44 cards lack artwork | Placeholders use rarity color bodies |
 | Collection filter hook is a pass-through | Search / rarity / variant filters not implemented |

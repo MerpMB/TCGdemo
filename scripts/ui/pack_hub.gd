@@ -3,7 +3,6 @@ extends Control
 
 
 const FALLBACK_PACK_SCENE := preload("res://scenes/Pack.tscn")
-const CLAIMABLE_PACK_IDS := ["starter_pack", "developer_pack"]
 
 
 @onready var _selector_row: HBoxContainer = %SelectorRow
@@ -13,8 +12,7 @@ const CLAIMABLE_PACK_IDS := ["starter_pack", "developer_pack"]
 @onready var _owned_count_label: Label = %OwnedCountLabel
 @onready var _status_label: Label = %StatusLabel
 @onready var _open_pack_button: Button = %OpenPackButton
-@onready var _claim_starter_button: Button = %ClaimStarterButton
-@onready var _claim_developer_button: Button = %ClaimDeveloperButton
+@onready var _claim_pack_button: Button = %ClaimPackButton
 @onready var _back_button: Button = %BackButton
 
 
@@ -27,8 +25,7 @@ var _is_opening := false
 
 func _ready() -> void:
 	_open_pack_button.pressed.connect(_on_open_pack_pressed)
-	_claim_starter_button.pressed.connect(_on_claim_pack.bind("starter_pack"))
-	_claim_developer_button.pressed.connect(_on_claim_pack.bind("developer_pack"))
+	_claim_pack_button.pressed.connect(_on_claim_selected_pack)
 	_back_button.pressed.connect(GameManager.go_to_main_menu)
 	PackInventoryManager.inventory_changed.connect(_on_inventory_changed)
 
@@ -135,11 +132,11 @@ func _on_open_pack_pressed() -> void:
 	GameManager.go_to_pack_opening()
 
 
-func _on_claim_pack(pack_id: String) -> void:
-	PackInventoryManager.add_pack(pack_id)
-	if _selected_pack and _selected_pack.pack_id == pack_id:
-		_status_label.text = "Claimed +1 %s." % _selected_pack.display_name
-
+func _on_claim_selected_pack() -> void:
+	if _selected_pack == null:
+		return
+	PackInventoryManager.add_pack(_selected_pack.pack_id)
+	_status_label.text = "Claimed +1 %s." % _selected_pack.display_name
 
 func _on_inventory_changed(pack_id: String, _owned_count: int) -> void:
 	_update_selector_button(pack_id)

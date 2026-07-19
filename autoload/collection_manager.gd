@@ -10,6 +10,16 @@ signal deck_changed()
 
 const DECK_SIZE_LIMIT := 10
 
+enum CollectionSort {
+	RECENTLY_OBTAINED,
+	OLDEST,
+	NAME,
+	RARITY,
+	VARIANT,
+	FAVORITES_FIRST,
+	SET,
+}
+
 
 var _collection: Array[CardData] = []
 var _deck: Array[CardData] = []
@@ -45,6 +55,7 @@ func export_save_data() -> Dictionary:
 			"card_id": card.card_id,
 			"variant": int(card.variant),
 			"instance_id": card.instance_id,
+			"is_favorite": card.is_favorite,
 		})
 
 	var deck_instance_ids: PackedStringArray = []
@@ -77,6 +88,7 @@ func hydrate_from_save_data(data: Dictionary, database: Node) -> bool:
 		var owned := template.duplicate_card()
 		owned.variant = variant as CardData.Variant
 		owned.instance_id = instance_id
+		owned.is_favorite = bool(entry.get("is_favorite", false))
 		restored_collection.append(owned)
 		seen_instance_ids[instance_id] = true
 
@@ -129,6 +141,43 @@ func restore_state_snapshot(snapshot: Dictionary) -> void:
 
 	collection_changed.emit()
 	deck_changed.emit()
+
+func set_card_favorite(instance_id: String, favorite: bool) -> bool:
+	var card := _get_card_by_instance(instance_id)
+	if card == null:
+		return false
+	if card.is_favorite == favorite:
+		return true
+	card.is_favorite = favorite
+	collection_changed.emit()
+	return true
+
+func get_sorted_collection(sort_mode: CollectionSort = CollectionSort.RECENTLY_OBTAINED) -> Array[CardData]:
+	var cards := get_collection()
+	if sort_mode == CollectionSort.RECENTLY_OBTAINED:
+		cards.reverse()
+		return cards
+	if sort_mode == CollectionSort.OLDEST:
+		return cards
+	cards.sort_custom(func(a: CardData, b: CardData) -> bool:
+		return _sorts_before(a, b, sort_mode)
+	)
+	return cards
+
+
+func _sorts_before(a: CardData, b: CardData, sort_mode: CollectionSort) -> bool:
+	match sort_mode:
+		CollectionSort.NAME:
+			return a.display_name.naturalnocasecmp_to(b.display_name) < 0
+		CollectionSort.RARITY:
+			return a.rarity > b.rarity if a.rarity != b.rarity else a.display_name.naturalnocasecmp_to(b.display_name) < 0
+		CollectionSort.VARIANT:
+			return a.variant < b.variant if a.variant != b.variant else a.display_name.naturalnocasecmp_to(b.display_name) < 0
+		CollectionSort.FAVORITES_FIRST:
+			return a.is_favorite if a.is_favorite != b.is_favorite else a.display_name.naturalnocasecmp_to(b.display_name) < 0
+		CollectionSort.SET:
+			return a.card_set.naturalnocasecmp_to(b.card_set) < 0 if a.card_set != b.card_set else a.display_name.naturalnocasecmp_to(b.display_name) < 0
+	return false
 
 func get_collection() -> Array[CardData]:
 	return _collection.duplicate()

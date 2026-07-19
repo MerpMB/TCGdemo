@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/card_data.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/cards/rogue/EPIC/06-sharpshooter.png" id="2_art"]
+
+[resource]
+script = ExtResource("1_script")
+card_id = "rogue_sharpshooter"
+display_name = "Sharpshooter"
+card_set = "Rogue Deck"
+description = ""
+rarity = 2
+variant = 0
+frame = "epic"
+card_back = "default"
+artwork = ExtResource("2_art")
+artist = ""
+flavor_text = ""
+tags = PackedStringArray("class_deck", "rogue")
+future_stats = {}

@@ -28,6 +28,9 @@ var owned_count_badge: Label
 var render_layer_container: Control
 ## Host Control size (for foil reset). Set by CardScene.
 var host_size := Vector2.ZERO
+var _art_base_material: Material
+var _body_base_material: Material
+var _back_base_material: Material
 
 var _variant_renderer: VariantRenderer = VariantRenderer.new()
 
@@ -55,6 +58,9 @@ func bind(
 ) -> void:
 	art_texture = p_art
 	card_body = p_body
+	_art_base_material = p_art.material
+	_body_base_material = p_body.material
+	_back_base_material = p_back_tex.material
 	frame_texture = p_frame_tex
 	frame_panel = p_frame_panel
 	back_texture = p_back_tex
@@ -80,37 +86,26 @@ func apply(card_data: CardData, back_type: CardVisualLibrary.CardBackType) -> vo
 		return
 	apply_frame(card_data)
 	apply_card_back(card_data, back_type)
-	var rarity_color := CardData.get_rarity_color(card_data.rarity)
 	apply_artwork(card_data)
-	rarity_glow.color = Color(rarity_color.r, rarity_color.g, rarity_color.b, 0.0)
+	rarity_glow.color = Color.TRANSPARENT
 	configure_variant_overlay(card_data)
 	_variant_renderer.bind(render_layer_container, host_size)
 	_variant_renderer.apply(card_data)
-
 
 func process_variant_idle(delta: float) -> void:
 	_variant_renderer.process_idle(delta)
 
 
-func apply_frame(card_data: CardData) -> void:
-	var frame := CardVisualLibrary.get_frame_texture(
-		CardVisualLibrary.resolve_frame_key(card_data)
-	)
-	if frame != null:
-		frame_texture.texture = frame
-		frame_texture.visible = true
-		frame_panel.visible = false
-	else:
-		frame_texture.texture = null
-		frame_texture.visible = false
-		frame_panel.visible = true
-		frame_panel.add_theme_stylebox_override(
-			"panel",
-			CardVisualLibrary.get_frame_overlay_style(card_data.rarity)
-		)
-
+func apply_frame(_card_data: CardData) -> void:
+	## Rarity remains a gameplay/data property; full-art cards do not render a rarity frame.
+	frame_texture.texture = null
+	frame_texture.hide()
+	frame_panel.hide()
 
 func apply_card_back(card_data: CardData, back_type: CardVisualLibrary.CardBackType) -> void:
+	back_texture.material = _back_base_material
+	back_texture.modulate = Color.WHITE
+	back_texture.self_modulate = Color.WHITE
 	var back_name := card_data.card_back if card_data else ""
 	var texture := CardVisualLibrary.get_card_back_texture(back_name)
 	if texture != null:
@@ -128,8 +123,11 @@ func apply_card_back(card_data: CardData, back_type: CardVisualLibrary.CardBackT
 
 
 func apply_artwork(card_data: CardData) -> void:
-	art_texture.material = null
+	art_texture.material = _art_base_material
 	art_texture.modulate = Color.WHITE
+	art_texture.self_modulate = Color.WHITE
+	card_body.modulate = Color.WHITE
+	card_body.self_modulate = Color.WHITE
 	var texture := CardVisualLibrary.resolve_artwork(card_data)
 	var has_art := texture != null
 	art_texture.texture = texture
@@ -168,9 +166,15 @@ func _apply_diamond_overlay() -> void:
 	pass
 
 func reset_variant_overlays() -> void:
-	card_body.material = null
-	art_texture.material = null
+	card_body.material = _body_base_material
+	art_texture.material = _art_base_material
 	art_texture.modulate = Color.WHITE
+	art_texture.self_modulate = Color.WHITE
+	card_body.modulate = Color.WHITE
+	card_body.self_modulate = Color.WHITE
+	back_texture.material = _back_base_material
+	back_texture.modulate = Color.WHITE
+	back_texture.self_modulate = Color.WHITE
 	frame_texture.material = null
 	frame_panel.material = null
 
@@ -211,12 +215,9 @@ func set_owned_count(count: int, gallery_mode: bool) -> void:
 	owned_count_badge.show()
 
 
-func set_rarity_glow(card_data: CardData, alpha: float) -> void:
-	if card_data == null:
-		return
-	var color := CardData.get_rarity_color(card_data.rarity)
-	rarity_glow.color = Color(color.r, color.g, color.b, alpha)
-
+func set_rarity_glow(_card_data: CardData, _alpha: float) -> void:
+	## Keep reveal timing and rarity logic intact without tinting the full-art surface.
+	rarity_glow.color = Color.TRANSPARENT
 
 func play_audio(player: AudioStreamPlayer) -> void:
 	if player and player.stream:

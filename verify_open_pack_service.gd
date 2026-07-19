@@ -15,11 +15,12 @@ func _run() -> void:
 
 	collection_manager.call("reset_runtime_data")
 	inventory_manager.call("reset_runtime_data")
-	var pack := pack_database.call("get_pack", "starter_pack") as PackConfig
+	var pack := pack_database.call("get_pack", "mage_pack") as PackConfig
 	if pack == null:
-		_fail("starter_pack is missing.")
+		_fail("mage_pack is missing.")
 		return
 
+	inventory_manager.call("add_pack", pack.pack_id)
 	var starting_inventory := int(inventory_manager.call("get_owned_count", pack.pack_id))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20260719
@@ -41,6 +42,7 @@ func _run() -> void:
 	if not collection_manager.call("add_to_deck", first_owned):
 		_fail("could not create a deck fixture.")
 		return
+	inventory_manager.call("add_pack", pack.pack_id)
 	var inventory_before_failure := int(inventory_manager.call("get_owned_count", pack.pack_id))
 	var collection_before_failure := int(collection_manager.call("get_collection_count"))
 	var deck_before_failure := int(collection_manager.call("get_deck_count"))

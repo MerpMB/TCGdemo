@@ -14,22 +14,41 @@ const CARD_CELL_WIDTH := 148
 @onready var _empty_label: Label = %EmptyLabel
 @onready var _count_label: Label = %CountLabel
 @onready var _back_button: Button = %BackButton
+@onready var _sort_option: OptionButton = %SortOption
+var _inspection_cards: Array[CardData] = []
+var _sort_mode := CollectionManager.CollectionSort.RECENTLY_OBTAINED
 
 
 func _ready() -> void:
 	_back_button.pressed.connect(func() -> void: GameManager.go_to_main_menu())
 	CollectionManager.collection_changed.connect(_refresh_collection)
+	_sort_option.item_selected.connect(_on_sort_selected)
+	_populate_sort_options()
 	_refresh_collection()
 	resized.connect(_update_grid_columns)
 	_update_grid_columns()
 
 
+func _populate_sort_options() -> void:
+	for label in ["Recently Obtained", "Oldest", "Name", "Rarity", "Variant", "Favorites First", "Set"]:
+		_sort_option.add_item(label)
+	_sort_option.select(int(_sort_mode))
+
+
+func _on_sort_selected(index: int) -> void:
+	_sort_mode = index as CollectionManager.CollectionSort
+	_refresh_collection()
+
 func _refresh_collection() -> void:
 	_clear_grid()
 
 	var entries := _stack_unique_collectibles(
-		_apply_view_filters(CollectionManager.get_collection())
+		_apply_view_filters(CollectionManager.get_sorted_collection(_sort_mode))
 	)
+	_inspection_cards.clear()
+	for entry in entries:
+		_inspection_cards.append(entry.card)
+
 	_empty_label.visible = entries.is_empty()
 	_count_label.text = "%d cards" % entries.size()
 
@@ -44,7 +63,8 @@ func _refresh_collection() -> void:
 
 func _on_card_pressed(card_scene: CardScene) -> void:
 	# CardViewer already exists — open the selected collectible.
-	GameManager.show_card_viewer(card_scene.get_card_data())
+	var selected_index := _inspection_cards.find(card_scene.get_card_data())
+	GameManager.show_card_inspection(_inspection_cards, selected_index)
 
 
 ## Stack exact duplicates only. Key = card_id + variant so Foil / Diamond / etc.

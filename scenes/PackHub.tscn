@@ -114,42 +114,13 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "Free Claim"
 
-[node name="StarterClaimRow" type="HBoxContainer" parent="MarginContainer/VBox"]
-layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="Label" type="Label" parent="MarginContainer/VBox/StarterClaimRow"]
+[node name="ClaimPackButton" type="Button" parent="MarginContainer/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 16
-text = "Starter Pack"
-vertical_alignment = 1
-
-[node name="ClaimStarterButton" type="Button" parent="MarginContainer/VBox/StarterClaimRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(140, 52)
-layout_mode = 2
 theme_override_font_sizes/font_size = 17
-text = "Claim"
-script = ExtResource("2_button")
-
-[node name="DeveloperClaimRow" type="HBoxContainer" parent="MarginContainer/VBox"]
-layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="Label" type="Label" parent="MarginContainer/VBox/DeveloperClaimRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 16
-text = "Developer Pack"
-vertical_alignment = 1
-
-[node name="ClaimDeveloperButton" type="Button" parent="MarginContainer/VBox/DeveloperClaimRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(140, 52)
-layout_mode = 2
-theme_override_font_sizes/font_size = 17
-text = "Claim"
+text = "Claim Selected Pack"
 script = ExtResource("2_button")
 
 [node name="BackButton" type="Button" parent="MarginContainer/VBox"]

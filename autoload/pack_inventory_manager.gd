@@ -7,9 +7,10 @@ signal inventory_changed(pack_id: String, owned_count: int)
 
 
 const INITIAL_COUNTS: Dictionary = {
-	"starter_pack": 99,
-	"developer_pack": 99,
-	"premium_pack": 0,
+	"knight_pack": 0,
+	"mage_pack": 0,
+	"priest_pack": 0,
+	"rogue_pack": 0,
 }
 
 

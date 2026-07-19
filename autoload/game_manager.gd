@@ -11,6 +11,7 @@ const SCENE_SETTINGS := "res://scenes/Settings.tscn"
 
 const DEVELOPER_PANEL_SCENE := preload("res://scenes/DeveloperPanel.tscn")
 const CARD_VIEWER_SCENE := preload("res://scenes/CardViewer.tscn")
+const CARD_INSPECTION_SCENE := preload("res://scenes/CardInspection.tscn")
 
 const FADE_DURATION := 0.15
 
@@ -18,6 +19,7 @@ var _fade_layer: CanvasLayer
 var _fade_rect: ColorRect
 var _developer_panel: CanvasLayer
 var _card_viewer: CanvasLayer
+var _card_inspection: CanvasLayer
 var _is_transitioning := false
 var selected_pack_id: String = ""
 var _visual_warmup_done := false
@@ -27,11 +29,15 @@ func _ready() -> void:
 	_setup_fade_overlay()
 	_setup_developer_panel()
 	_setup_card_viewer()
+	_setup_card_inspection()
 	## After other autoloads finish _ready (CardDatabase must exist for art prefetch).
 	call_deferred("_warmup_visual_assets")
 
 
 func _input(event: InputEvent) -> void:
+	## Card Inspection owns keyboard/controller input for its entire visible lifetime.
+	if _card_inspection and _card_inspection.is_modal_active():
+		return
 	if event.is_action_pressed("toggle_developer_panel"):
 		toggle_developer_panel()
 
@@ -155,6 +161,10 @@ func show_card_viewer(card_data: CardData) -> void:
 	_card_viewer.show_card(card_data)
 
 
+func show_card_inspection(cards: Array[CardData], selected_index: int) -> void:
+	if _card_inspection:
+		_card_inspection.show_cards(cards, selected_index)
+
 func toggle_developer_panel() -> void:
 	if _developer_panel == null:
 		return
@@ -183,6 +193,11 @@ func _setup_developer_panel() -> void:
 	_developer_panel.visible = false
 	add_child(_developer_panel)
 
+
+func _setup_card_inspection() -> void:
+	_card_inspection = CARD_INSPECTION_SCENE.instantiate()
+	_card_inspection.visible = false
+	add_child(_card_inspection)
 
 func _setup_card_viewer() -> void:
 	_card_viewer = CARD_VIEWER_SCENE.instantiate()

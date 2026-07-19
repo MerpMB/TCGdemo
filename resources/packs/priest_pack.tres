@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="PackConfig" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/pack_config.gd" id="1_packconfig"]
+[ext_resource type="PackedScene" path="res://scenes/Pack.tscn" id="2_packscene"]
+
+[resource]
+script = ExtResource("1_packconfig")
+pack_id = "priest_pack"
+display_name = "Priest Class Pack"
+cards_per_pack = 7
+rarity_weights = {
+0: 60.0,
+1: 25.0,
+2: 12.0,
+3: 3.0
+}
+variant_weights = {
+0: 85.0,
+1: 8.0,
+2: 3.0,
+3: 3.0,
+4: 1.0
+}
+allowed_sets = PackedStringArray("Priest Deck")
+excluded_tags = PackedStringArray("event", "limited", "developer", "debug")
+debug_only = false
+visible_in_shop = true
+pack_scene = ExtResource("2_packscene")
+primary_color = Color(0.72, 0.42, 0.72, 1)
+accent_color = Color(0.98, 0.88, 0.64, 1)
+description = "A devotional collection of healers, saints, and holy leaders."

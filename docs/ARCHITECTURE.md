@@ -20,18 +20,19 @@ This document describes the current systems, their responsibilities, and the des
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │                            UI Layer                                  │
-│  MainMenu  PackOpening  Collection  CardViewer  DeckBuilder  ...     │
-│       │          │            │          │                           │
-│       └──────────┴────────────┴──────────┴───────────────────────────┘
+│  MainMenu  PackHub  PackOpening  Collection  CardViewer  ...         │
+│       │       │          │            │          │                   │
+│       └───────┴──────────┴────────────┴──────────┴───────────────────┘
 │                          │                                           │
 │                    GameManager                                       │
-│         (navigation, CardViewer overlay, developer panel)            │
+│         (navigation, overlays, developer panel)                      │
 └──────────────────────────┬───────────────────────────────────────────┘
                            │
 ┌──────────────────────────┴───────────────────────────────────────────┐
 │                         Manager Layer                                  │
 │                                                                        │
-│   CollectionManager ◄──── SaveManager (placeholder)                  │
+│   CollectionManager ◄──── SaveManager (versioned JSON)                 │
+│   PackInventoryManager ◄── OpenPackService (open + rollback)           │
 │         │                                                              │
 │         ├── CardDatabase          PackDatabase                         │
 └─────────┴──────────────────────────┬───────────────────────────────────┘
@@ -57,6 +58,8 @@ This document describes the current systems, their responsibilities, and the des
 ```
 Main Menu
     ↓
+Pack Hub (select / claim class pack)
+    ↓
 Open Pack
     ↓
 Reveal 7 Cards
@@ -65,12 +68,12 @@ Cards Added to Collection
     ↓
 Collection Gallery
     ↓
-Card Viewer (tap a card)
+Card Viewer / Card Inspection (tap a card)
     ↓
 Repeat
 ```
 
-The main menu is mobile-first portrait (720×1280). `GameManager` selects the active `PackConfig` (default: `starter_pack`) before navigating to pack opening.
+The main menu is mobile-first portrait (720×1280). `GameManager` selects the active `PackConfig` (selected from the four class packs) before navigating to pack opening.
 
 ---
 
@@ -248,11 +251,11 @@ Array[CardData] pack contents
 ### Pack types (current)
 
 | Pack | Set filter | Notes |
-|------|-----------|-------|
-| `starter_pack` | Core Set | Default main-menu pack |
-| `premium_pack` | Core Set | Higher rarity weights |
-| `event_pack` | Event Set | Event-tagged cards |
-| `developer_pack` | Developer Set | Debug / dev cards |
+|------|------------|-------|
+| `knight_pack` | Knight Deck | Knight class cards only |
+| `mage_pack` | Mage Deck | Elemental mage cards only |
+| `priest_pack` | Priest Deck | Priest class cards only |
+| `rogue_pack` | Rogue Deck | Rogue class cards only |
 
 ---
 
@@ -295,7 +298,23 @@ Array[CardData] pack contents
 
 **Path:** `autoload/save_manager.gd`
 
-- Placeholder stubs for future persistence (`save_game`, `load_game`, `delete_save`)
+- Versioned JSON persistence (`SAVE_VERSION`, `user://tcg_save.json`)
+- Serializes collection, pack inventory, selected pack, settings, and player statistics
+- Loads on startup; `OpenPackService` saves after successful pack opens
+
+### PackInventoryManager
+
+**Path:** `autoload/pack_inventory_manager.gd`
+
+- Runtime ownership of unopened packs
+- Consumed via `OpenPackService` (not directly from UI transaction logic)
+
+### OpenPackService
+
+**Path:** `autoload/open_pack_service.gd`
+
+- Application service for pack opens: generate → persist → consume
+- Returns typed success/failure; rolls back collection/inventory on failure
 
 ---
 
@@ -331,7 +350,7 @@ Array[CardData] pack contents
 |-------|------|-------------|
 | `card_id` | `String` | Unique catalog identifier |
 | `display_name` | `String` | Display name |
-| `card_set` | `String` | Set name (e.g. "Core Set") |
+| `card_set` | `String` | Deck/set name (e.g. "Mage Deck") |
 | `rarity` | `enum` | Common, Rare, Epic, Legendary |
 | `variant` | `enum` | Normal, Foil, Negative, Alt Art, Diamond |
 | `frame` | `String` | Optional frame key override |

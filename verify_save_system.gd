@@ -21,16 +21,16 @@ func _run() -> void:
 	save_manager.call("set_storage_paths_for_testing", TEST_SAVE_PATH, TEST_TEMP_PATH)
 	save_manager.call("delete_save")
 
-	var template := database.call("get_card", "common_001") as CardData
+	var template := database.call("get_card", "mage_rookie_fire_mage") as CardData
 	if template == null:
 		_fail("fixture card is missing.")
 		return
 	var owned := collection.call("add_card", template) as CardData
 	collection.call("add_to_deck", owned)
-	inventory.call("add_pack", "premium_pack", 3)
+	inventory.call("add_pack", "knight_pack", 3)
 	save_manager.call("apply_player_statistics", {"packs_opened": 7})
 	save_manager.call("apply_settings", {"music_enabled": false})
-	game_manager.call("set_selected_pack", "premium_pack")
+	game_manager.call("set_selected_pack", "knight_pack")
 
 	if not save_manager.call("save_game"):
 		_fail("serialization failed.")
@@ -51,7 +51,7 @@ func _run() -> void:
 	if int(collection.call("get_deck_count")) != 1:
 		_fail("deck instance IDs did not round-trip.")
 		return
-	if int(inventory.call("get_owned_count", "premium_pack")) != 3:
+	if int(inventory.call("get_owned_count", "knight_pack")) != 3:
 		_fail("inventory did not round-trip.")
 		return
 	if save_manager.call("get_player_statistics").get("packs_opened") != 7:
@@ -60,7 +60,7 @@ func _run() -> void:
 	if save_manager.call("get_settings").get("music_enabled") != false:
 		_fail("settings did not round-trip.")
 		return
-	if String(game_manager.get("selected_pack_id")) != "premium_pack":
+	if String(game_manager.get("selected_pack_id")) != "knight_pack":
 		_fail("selected pack did not round-trip.")
 		return
 

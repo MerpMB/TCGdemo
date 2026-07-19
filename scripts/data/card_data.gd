@@ -47,7 +47,7 @@ const VARIANT_LABELS: Dictionary = {
 
 @export var card_id: String = ""
 @export var display_name: String = ""
-@export var card_set: String = "Core Set"
+@export var card_set: String = ""
 @export var description: String = ""
 @export var rarity: Rarity = Rarity.COMMON
 @export var variant: Variant = Variant.NORMAL
@@ -61,6 +61,7 @@ const VARIANT_LABELS: Dictionary = {
 
 ## Assigned by CollectionManager when a card enters the player's collection.
 var instance_id: String = ""
+var is_favorite := false
 
 
 func duplicate_card() -> CardData:
@@ -78,6 +79,7 @@ func duplicate_card() -> CardData:
 	copy.flavor_text = flavor_text
 	copy.tags = tags.duplicate()
 	copy.future_stats = future_stats.duplicate()
+	copy.is_favorite = is_favorite
 	return copy
 
 

@@ -48,8 +48,6 @@ const RARITY_ART_FOLDERS := {
 
 ## Card set → artwork subfolder (overrides rarity folder when applicable).
 const SET_ART_FOLDERS := {
-	"Event Set": "event",
-	"Developer Set": "developer",
 }
 
 ## Variant → subfolder under assets/variants/.

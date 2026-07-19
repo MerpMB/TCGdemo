@@ -57,6 +57,11 @@ text = "Collection"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="SortOption" type="OptionButton" parent="MarginContainer/VBox/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(150, 44)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
 [node name="CountLabel" type="Label" parent="MarginContainer/VBox/Header"]
 unique_name_in_owner = true
 layout_mode = 2

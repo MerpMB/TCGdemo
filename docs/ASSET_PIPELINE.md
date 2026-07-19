@@ -9,12 +9,10 @@ Production workflow for all card visual assets. **Every load path goes through `
 ```
 assets/
     cards/
-        common/         Core Set common-rarity artwork
-        rare/
-        epic/
-        legendary/
-        event/            Event Set artwork
-        developer/        Developer Set artwork
+        knight/          Knight Deck artwork, grouped by rarity
+        mage/            Mage Deck artwork, grouped by rarity
+        priest/          Priest Deck artwork, grouped by rarity
+        rogue/           Rogue Deck artwork, grouped by rarity
 
     frames/
         common.png
@@ -49,7 +47,7 @@ Empty folders are tracked via `.gitkeep`. Drop PNGs in place — no code changes
 
 | Rule | Example |
 |------|---------|
-| Lowercase only | `common_001.png` |
+| Lowercase only | `mage_rookie_fire_mage.png` |
 | Underscores, no spaces | `rare_fire_mage_001.png` |
 | Match `card_id` when using convention lookup | `common_005.tres` → `common/common_005.png` |
 | Frame keys match rarity or `CardData.frame` | `frames/rare.png` |
@@ -74,9 +72,7 @@ Legacy artwork filenames (e.g. `01-rookie-fire-mage.png`) remain valid when assi
 
 ### Artwork folder selection
 
-1. `Event Set` → `cards/event/`
-2. `Developer Set` → `cards/developer/`
-3. Otherwise → rarity folder (`common`, `rare`, `epic`, `legendary`)
+Artwork is assigned explicitly in each CardData resource. Store it under its deck folder (cards/knight/, cards/mage/, cards/priest/, or cards/rogue/) and retain the rarity subfolder from the source deck.
 
 ---
 
