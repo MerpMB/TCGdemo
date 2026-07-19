@@ -38,6 +38,39 @@ func remove_card_by_instance(instance_id: String) -> void:
 			return
 
 
+func create_state_snapshot() -> Dictionary:
+	var collection_copies: Array[CardData] = []
+	for card in _collection:
+		collection_copies.append(_copy_card_with_instance(card))
+
+	var deck_instance_ids: PackedStringArray = []
+	for card in _deck:
+		deck_instance_ids.append(card.instance_id)
+
+	return {
+		"collection": collection_copies,
+		"deck_instance_ids": deck_instance_ids,
+		"next_instance_id": _next_instance_id,
+	}
+
+
+func restore_state_snapshot(snapshot: Dictionary) -> void:
+	var restored_collection: Array[CardData] = []
+	for card in snapshot.get("collection", []):
+		if card is CardData:
+			restored_collection.append(_copy_card_with_instance(card))
+
+	_collection = restored_collection
+	_next_instance_id = maxi(int(snapshot.get("next_instance_id", 1)), 1)
+	_deck.clear()
+	for instance_id in snapshot.get("deck_instance_ids", []):
+		var owned := _get_card_by_instance(String(instance_id))
+		if owned:
+			_deck.append(owned)
+
+	collection_changed.emit()
+	deck_changed.emit()
+
 func get_collection() -> Array[CardData]:
 	return _collection.duplicate()
 
@@ -97,6 +130,18 @@ func reset_runtime_data() -> void:
 	collection_changed.emit()
 	deck_changed.emit()
 
+
+func _copy_card_with_instance(card: CardData) -> CardData:
+	var copy := card.duplicate_card()
+	copy.instance_id = card.instance_id
+	return copy
+
+
+func _get_card_by_instance(instance_id: String) -> CardData:
+	for card in _collection:
+		if card.instance_id == instance_id:
+			return card
+	return null
 
 func _create_instance_id() -> String:
 	var id := "inst_%06d" % _next_instance_id

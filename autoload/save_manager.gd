@@ -1,17 +1,16 @@
 extends Node
-## Persistence layer placeholder for Phase 6.
-## Other systems call these methods; disk I/O is not implemented yet.
-##
-## Planned consumers: CollectionManager (collection + deck), future settings.
+## Persistence boundary. This service owns storage only; application services
+## decide business transactions and call save_game() when state must be stored.
+## The versioned disk implementation is added in the next foundation phase.
 
 
-func save_game() -> void:
-	pass
+func save_game() -> bool:
+	return true
 
 
-func load_game() -> void:
-	pass
+func load_game() -> bool:
+	return true
 
 
-func delete_save() -> void:
-	pass
+func delete_save() -> bool:
+	return true
