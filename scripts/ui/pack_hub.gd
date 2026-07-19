@@ -129,11 +129,6 @@ func _on_open_pack_pressed() -> void:
 	if _is_opening or _selected_pack == null:
 		return
 	var pack_id := _selected_pack.pack_id
-	if not PackInventoryManager.consume_pack(pack_id):
-		_status_label.text = "No %s packs available." % _selected_pack.display_name
-		_refresh_selected_pack()
-		return
-
 	_is_opening = true
 	_open_pack_button.disabled = true
 	GameManager.set_selected_pack(pack_id)

@@ -28,6 +28,7 @@ PackDatabase="*res://autoload/pack_database.gd"
 PackInventoryManager="*res://autoload/pack_inventory_manager.gd"
 CollectionManager="*res://autoload/collection_manager.gd"
 SaveManager="*res://autoload/save_manager.gd"
+OpenPackService="*res://autoload/open_pack_service.gd"
 
 [display]
 

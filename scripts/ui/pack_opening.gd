@@ -1,4 +1,5 @@
 extends Control
+const OpenPackResultData = preload("res://scripts/systems/open_pack_result.gd")
 ## Pack opening orchestration — layout math and FX live in PackLayout / PackAnimation.
 
 
@@ -31,7 +32,6 @@ var _pack_scene: PackScene
 var _pack_cards: Array[CardData] = []
 var _card_scenes: Array[CardScene] = []
 var _revealed_count := 0
-var _cards_added := false
 var _layout_scale := 1.0
 var _skip_requested := false
 var _flash_tween: Tween
@@ -65,9 +65,14 @@ func _prepare_and_open() -> void:
 		_status_label.text = "No pack available."
 		return
 
-	_pack_cards = PackGenerator.generate_pack(CardDatabase, pack_config)
+	var open_result := OpenPackService.call("open_pack", pack_config.pack_id) as Dictionary
+	if not open_result.succeeded:
+		_status_label.text = open_result.message
+		_show_result_actions()
+		return
+
+	_pack_cards = open_result.cards
 	_revealed_count = 0
-	_cards_added = false
 	_spawn_pack_visual()
 	_show_pack_stage()
 	_status_label.text = "Opening your pack..."
@@ -234,10 +239,6 @@ func _finish_pack() -> void:
 	_reveal_all_button.hide()
 	_reveal_all_button.disabled = true
 	_stop_screen_flash()
-
-	if not _cards_added:
-		CollectionManager.add_cards(_pack_cards)
-		_cards_added = true
 
 	_status_label.text = "%d cards added to your collection!" % _pack_cards.size()
 	_show_result_actions()
