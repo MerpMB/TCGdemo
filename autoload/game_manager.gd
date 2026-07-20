@@ -22,7 +22,7 @@ var _card_viewer: CanvasLayer
 var _card_inspection: CanvasLayer
 var _is_transitioning := false
 var selected_pack_id: String = ""
-var _visual_warmup_done := false
+var _common_visual_warmup_done := false
 
 
 func _ready() -> void:
@@ -30,8 +30,8 @@ func _ready() -> void:
 	_setup_developer_panel()
 	_setup_card_viewer()
 	_setup_card_inspection()
-	## After other autoloads finish _ready (CardDatabase must exist for art prefetch).
-	call_deferred("_warmup_visual_assets")
+	## Keep boot responsive: only shared card assets are prepared before Main Menu.
+	call_deferred("_warmup_common_visual_assets")
 
 
 func _input(event: InputEvent) -> void:
@@ -42,23 +42,21 @@ func _input(event: InputEvent) -> void:
 		toggle_developer_panel()
 
 
-## Prefetch shaders, procedural maps, Synth bake, frames, and catalog art at boot
-## so pack opening does not hitch on first Foil / Diamond / Synth / art resolve.
-func _warmup_visual_assets() -> void:
-	if _visual_warmup_done:
+## Boot pass: frames, default card back, and the shared rounded-card shader only.
+func _warmup_common_visual_assets() -> void:
+	if _common_visual_warmup_done:
 		return
-	_visual_warmup_done = true
+	_common_visual_warmup_done = true
 
-	## Let MainMenu mount one frame before the heavier CPU work.
+	## Let MainMenu mount before submitting the small shared shader pass.
 	await get_tree().process_frame
 
-	var materials: Array[ShaderMaterial] = CardVisualLibrary.warmup(CardDatabase)
-	await _force_shader_gpu_compile(materials)
+	var materials: Array[ShaderMaterial] = CardVisualLibrary.warmup_common()
+	await _force_shader_gpu_compile(materials, "common card")
 
 
-## Draw each warmed material once offscreen so the GPU compiles shaders now,
-## not during the first pack-card fly-out.
-func _force_shader_gpu_compile(materials: Array[ShaderMaterial]) -> void:
+## Draw each warmed material once offscreen so its GPU program is ready before use.
+func _force_shader_gpu_compile(materials: Array[ShaderMaterial], label: String) -> void:
 	if materials.is_empty():
 		return
 
@@ -88,8 +86,7 @@ func _force_shader_gpu_compile(materials: Array[ShaderMaterial]) -> void:
 	await get_tree().process_frame
 
 	layer.queue_free()
-	print("GameManager: variant shader GPU compile pass finished.")
-
+	print("GameManager: %s shader GPU compile pass finished." % label)
 
 func go_to_main_menu() -> void:
 	change_scene(SCENE_MAIN_MENU)

@@ -97,9 +97,9 @@ static var _artwork_texture_cache: Dictionary = {}
 static var _variant_texture_cache: Dictionary = {}
 static var _card_back_texture_cache: Dictionary = {}
 static var _glow_texture_cache: Dictionary = {}
-## True after warmup() has filled caches (shaders, procedural maps, frames, art).
-static var _warmup_complete := false
-
+## Boot and rare-variant passes are intentionally separate so startup stays responsive.
+static var _common_warmup_complete := false
+static var _pack_variant_warmup_complete := false
 ## One warning per missing key per session.
 static var _missing_frame_warned: Dictionary = {}
 static var _missing_card_back_warned: Dictionary = {}
@@ -295,38 +295,55 @@ static func validate_card_assets(card: CardData) -> void:
 		return
 
 
-## Whether startup warmup has already filled visual caches.
+## Whether both the common and rare-variant warmup passes have completed.
 static func is_warmup_complete() -> bool:
-	return _warmup_complete
+	return _common_warmup_complete and _pack_variant_warmup_complete
 
 
-## Load shaders, procedural textures, Synth topology, frames, backs, glows, and
-## catalog artwork at game start so pack opening does not hitch on first use.
-## Pass CardDatabase (or any node with get_all_cards()) to prefetch card art.
-## Returns ShaderMaterials the caller should draw once to force GPU compile.
+## Compatibility full warmup for tools/tests. Gameplay uses the staged functions below.
 static func warmup(catalog: Node = null) -> Array[ShaderMaterial]:
-	if _warmup_complete:
-		return _build_warmup_materials()
+	var materials: Array[ShaderMaterial] = warmup_common()
+	materials.append_array(warmup_pack_variants(catalog))
+	return materials
+
+
+## Startup pass: only shared frames, default back, and the rounded-card clip shader.
+static func warmup_common() -> Array[ShaderMaterial]:
+	if _common_warmup_complete:
+		return _build_common_warmup_materials()
 
 	var started_msec := Time.get_ticks_msec()
-
 	_warmup_frames_and_backs()
+	_common_warmup_complete = true
+	var materials := _build_common_warmup_materials()
+	print("CardVisualLibrary: common warmup complete in %d ms (%d compile material)." % [
+		Time.get_ticks_msec() - started_msec,
+		materials.size(),
+	])
+	return materials
+
+
+## Explicit tooling pass: expensive procedural assets, Synth bake, variant layers, and catalog art.
+## Gameplay intentionally leaves these lazy so neither boot nor Pack Hub selection stalls.
+static func warmup_pack_variants(catalog: Node = null) -> Array[ShaderMaterial]:
+	if _pack_variant_warmup_complete:
+		return []
+
+	var started_msec := Time.get_ticks_msec()
 	_warmup_glows()
 	_warmup_procedural_textures()
 	_warmup_synth_topology()
-	var materials := _build_warmup_materials()
+	var materials := _build_variant_warmup_materials()
 	_warmup_variant_layer_stacks()
 	if catalog != null and catalog.has_method("get_all_cards"):
 		_warmup_catalog_artwork(catalog)
 
-	_warmup_complete = true
-	var elapsed := Time.get_ticks_msec() - started_msec
+	_pack_variant_warmup_complete = true
 	print(
-		"CardVisualLibrary: warmup complete in %d ms (%d shaders cached, %d compile materials)."
-		% [elapsed, _VariantShaderCache.cached_count(), materials.size()]
+		"CardVisualLibrary: pack variant warmup complete in %d ms (%d shaders cached, %d compile materials)."
+		% [Time.get_ticks_msec() - started_msec, _VariantShaderCache.cached_count(), materials.size()]
 	)
 	return materials
-
 
 static func _warmup_frames_and_backs() -> void:
 	for rarity in FRAME_KEYS.keys():
@@ -356,8 +373,17 @@ static func _warmup_synth_topology() -> void:
 	_SynthMaterials.warmup_topology()
 
 
-static func _build_warmup_materials() -> Array[ShaderMaterial]:
-	## Create one configured material per production shader so GPU compile can run offscreen.
+static func _build_common_warmup_materials() -> Array[ShaderMaterial]:
+	var shader := load("%s/card_rounded_clip.gdshader" % SHADERS_ROOT) as Shader
+	if shader == null:
+		return []
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	return [material]
+
+
+static func _build_variant_warmup_materials() -> Array[ShaderMaterial]:
+	## Create one configured material per rare production shader for the staged GPU pass.
 	var materials: Array[ShaderMaterial] = []
 	var candidates: Array = [
 		create_foil_rainbow_material(),
@@ -372,7 +398,6 @@ static func _build_warmup_materials() -> Array[ShaderMaterial]:
 		if material is ShaderMaterial:
 			materials.append(material as ShaderMaterial)
 	return materials
-
 
 static func _warmup_variant_layer_stacks() -> void:
 	## Only variants whose layers are shader/procedural-backed (no missing-PNG spam).

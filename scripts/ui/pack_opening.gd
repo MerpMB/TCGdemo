@@ -249,14 +249,32 @@ func _finish_pack() -> void:
 func _show_result_actions() -> void:
 	_result_actions.show()
 	_exit_button.show()
-	_continue_button.show()
+	if _has_remaining_selected_packs():
+		_exit_button.text = "Exit to Pack Hub"
+		_exit_button.custom_minimum_size.y = 52.0
+		_exit_button.add_theme_font_size_override("font_size", 17)
+		_continue_button.show()
+		_continue_button.disabled = false
+		return
+
+	## The selected pack is depleted: keep a single, clear recovery path.
+	_exit_button.text = "Exit to Pack Hub"
+	_exit_button.custom_minimum_size.y = 64.0
+	_exit_button.add_theme_font_size_override("font_size", 20)
+	_continue_button.hide()
+
+
+func _has_remaining_selected_packs() -> bool:
+	var pack_config := GameManager.get_selected_pack()
+	return pack_config != null and PackInventoryManager.can_open_pack(pack_config.pack_id)
 
 
 func _hide_result_actions() -> void:
 	_result_actions.hide()
 	_exit_button.hide()
 	_continue_button.hide()
-
+	_exit_button.disabled = false
+	_continue_button.disabled = false
 
 func _on_skip_pressed() -> void:
 	if _state == FlowState.DONE or _skip_requested or _pack_cards.is_empty():
@@ -327,12 +345,16 @@ func _stop_screen_flash() -> void:
 func _on_continue_pressed() -> void:
 	if _state != FlowState.DONE:
 		return
-	GameManager.go_to_pack_hub()
+	if not _has_remaining_selected_packs():
+		_show_result_actions()
+		return
+	_continue_button.disabled = true
+	_exit_button.disabled = true
+	_prepare_and_open()
 
 
 func _on_exit_pressed() -> void:
-	GameManager.go_to_main_menu()
-
+	GameManager.go_to_pack_hub()
 
 func _clear_cards() -> void:
 	for card_scene in _card_scenes:
