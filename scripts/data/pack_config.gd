@@ -25,6 +25,8 @@ extends Resource
 @export var pack_scene: PackedScene
 @export var pack_back: Texture2D
 @export var pack_icon: Texture2D
+## Full front artwork shown by the shared PackScene in the hub and opening flow.
+@export var pack_art: Texture2D
 @export var primary_color: Color = Color(0.28, 0.38, 0.72)
 @export var accent_color: Color = Color(0.95, 0.78, 0.2)
 @export var description: String = ""

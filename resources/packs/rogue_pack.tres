@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="PackConfig" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="PackConfig" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/data/pack_config.gd" id="1_packconfig"]
 [ext_resource type="PackedScene" path="res://scenes/Pack.tscn" id="2_packscene"]
+[ext_resource type="Texture2D" path="res://assets/packs/roguepack.png" id="3_packart"]
 
 [resource]
 script = ExtResource("1_packconfig")
@@ -26,6 +27,7 @@ excluded_tags = PackedStringArray("event", "limited", "developer", "debug")
 debug_only = false
 visible_in_shop = true
 pack_scene = ExtResource("2_packscene")
+pack_art = ExtResource("3_packart")
 primary_color = Color(0.28, 0.58, 0.44, 1)
 accent_color = Color(0.74, 0.94, 0.62, 1)
 description = "A covert collection of scouts, hunters, assassins, and guild legends."
