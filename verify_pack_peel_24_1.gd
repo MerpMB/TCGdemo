@@ -2,6 +2,15 @@ extends SceneTree
 ## Issue 24.1 — Left→right progressive peel + held full-attached pose.
 
 
+func _strip_visible(flap_pivot: Control) -> bool:
+	if not flap_pivot.visible:
+		return false
+	for child in flap_pivot.get_children():
+		if child is Control and child.visible:
+			return true
+	return false
+
+
 func _initialize() -> void:
 	var packed := load("res://scenes/Pack.tscn") as PackedScene
 	var pack := packed.instantiate() as PackScene
@@ -51,20 +60,34 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	## Early peel — left corner only; right seal still flush; hinge at tear tip.
+	## Early peel — tear advances, but rotation stays sticky (first-third delay).
 	pack.call("_apply_physical_peel", 0.22)
 	await process_frame
 	var early_w: float = flap_pivot.size.x
+	var early_rot: float = absf(flap_pivot.rotation)
 	if pack.get_wrapper_stage() != PackScene.WrapperStage.PEELING:
 		push_error("24.1 FAIL early: stage not PEELING.")
 		quit(1)
 		return
-	if not flap.visible or not flap.is_visible_in_tree():
-		push_error("24.1 FAIL early: peeled corner not visible.")
+	if not _strip_visible(flap_pivot):
+		push_error("24.1 FAIL early: peeled strip not visible.")
 		quit(1)
 		return
 	if not seal.visible:
 		push_error("24.1 FAIL early: unpeeled right seal must stay flush.")
+		quit(1)
+		return
+	## Soft bone chain should curl the free tip more than the hinge segment.
+	var hinge_bone := flap_pivot.get_node_or_null("BendBone0") as Control
+	var tip_bone := flap_pivot.get_node_or_null(
+		"BendBone0/BendBone1/BendBone2/BendBone3/BendBone4"
+	) as Control
+	if hinge_bone == null or tip_bone == null:
+		push_error("24.1 FAIL early: bend bone chain missing.")
+		quit(1)
+		return
+	if absf(tip_bone.rotation) + 0.001 < absf(hinge_bone.rotation):
+		push_error("24.1 FAIL early: tip should curl at least as much as hinge bone.")
 		quit(1)
 		return
 	if early_w > sprite.size.x * 0.45:
@@ -83,11 +106,17 @@ func _initialize() -> void:
 		push_error("24.1 FAIL early: strip detached while peeling.")
 		quit(1)
 		return
+	## First-third resistance: rotation must stay subdued while tear still advances.
+	if early_rot > 0.22:
+		push_error("24.1 FAIL early: rotation not delayed (rot=%s)." % early_rot)
+		quit(1)
+		return
 
-	## Mid peel — tear progressed left → right (wider peel, seal still remains).
+	## Mid peel — tear progressed left → right; free lift begins after sticky phase.
 	pack.call("_apply_physical_peel", 0.55)
 	await process_frame
 	var mid_w: float = flap_pivot.size.x
+	var mid_rot: float = absf(flap_pivot.rotation)
 	if pack.get_wrapper_stage() != PackScene.WrapperStage.PEELING:
 		push_error("24.1 FAIL mid: stage not PEELING.")
 		quit(1)
@@ -108,7 +137,11 @@ func _initialize() -> void:
 		push_error("24.1 FAIL mid: hinge not following tear tip.")
 		quit(1)
 		return
-	if flap_pivot.position.length() > 0.5 or flap.modulate.a < 0.99:
+	if mid_rot <= early_rot + 0.08:
+		push_error("24.1 FAIL mid: free lift did not increase after resistance (e=%s m=%s)." % [early_rot, mid_rot])
+		quit(1)
+		return
+	if flap_pivot.position.length() > 0.5 or flap_pivot.modulate.a < 0.99:
 		push_error("24.1 FAIL mid: early detach/fade.")
 		quit(1)
 		return
@@ -140,12 +173,29 @@ func _initialize() -> void:
 		push_error("24.1 FAIL Frame3: strip must stay attached (pos=%s)." % flap_pivot.position)
 		quit(1)
 		return
-	if flap.modulate.a < 0.99:
+	if flap_pivot.modulate.a < 0.99:
 		push_error("24.1 FAIL Frame3: attached strip must be fully opaque.")
 		quit(1)
 		return
-	if not flap.visible:
+	if not _strip_visible(flap_pivot):
 		push_error("24.1 FAIL Frame3: peeled strip not visible.")
+		quit(1)
+		return
+	tip_bone = flap_pivot.get_node_or_null(
+		"BendBone0/BendBone1/BendBone2/BendBone3/BendBone4"
+	) as Control
+	hinge_bone = flap_pivot.get_node_or_null("BendBone0") as Control
+	if tip_bone == null or hinge_bone == null:
+		push_error("24.1 FAIL Frame3: bend bone chain missing.")
+		quit(1)
+		return
+	## Tip joint should carry a clear share of peel-% curl (not a rigid board).
+	if absf(tip_bone.rotation) < 0.12:
+		push_error("24.1 FAIL Frame3: tip curl too weak to read as foil bend (rot=%s)." % tip_bone.rotation)
+		quit(1)
+		return
+	if absf(tip_bone.rotation) <= absf(hinge_bone.rotation) + 0.02:
+		push_error("24.1 FAIL Frame3: foil bend not curling toward free tip.")
 		quit(1)
 		return
 
@@ -189,7 +239,7 @@ func _initialize() -> void:
 		push_error("24.1 FAIL Frame4: detached strip did not drift (pos=%s)." % flap_pivot.position)
 		quit(1)
 		return
-	if flap.modulate.a >= 0.99:
+	if flap_pivot.modulate.a >= 0.99:
 		push_error("24.1 FAIL Frame4: strip should fade while flying.")
 		quit(1)
 		return

@@ -32,6 +32,23 @@ const FOUNDATION_PROGRESS_CATCHUP_RATE := 2.0
 const FOUNDATION_DETACH_DURATION := 0.6
 const FOUNDATION_DETACH_DRIFT := Vector2(36.0, -160.0)
 const FOUNDATION_DETACH_EXTRA_SPIN := 0.7
+## First third of opening: rotation stays sticky (resistance) before free lift.
+const FOUNDATION_ROT_DELAY := 0.33
+## Ease-in power during the sticky phase (higher = more early resistance).
+const FOUNDATION_ROT_RESISTANCE := 2.4
+## Rotation reached by the end of the sticky phase, as a fraction of peel_rot_start.
+const FOUNDATION_STICKY_ROT_FRACTION := 0.28
+## Free-lift ease-out power after the sticky phase.
+const FOUNDATION_FREE_LIFT_EASE := 1.55
+## Soft foil curl along the peeled strip (bone-chain bend, not a rigid board).
+const FOUNDATION_BEND_STRENGTH := 1.05
+const BEND_BONE_COUNT := 5
+## How strongly peel-% drives curl (radians at full open, before mouse boost).
+const FOUNDATION_BEND_FROM_PROGRESS := 1.15
+## Extra tip curl from pulling the cursor above the pack.
+const FOUNDATION_BEND_FROM_CURSOR := 0.95
+const FOUNDATION_BEND_MAX := 2.05
+const FOUNDATION_BEND_POWER := 1.55
 
 const FALLBACK_SPRITE_SIZE := Vector2(180.0, 240.0)
 const TEAR_FINISH_VISUAL := 0.995
@@ -45,10 +62,16 @@ const TEAR_FINISH_VISUAL := 0.995
 @export_range(0.08, 0.35, 0.01) var min_peel_width_ratio: float = FOUNDATION_MIN_PEEL_WIDTH_RATIO
 ## Opening amount at which the strip is fully peeled but still attached on the right.
 @export_range(0.75, 0.98, 0.01) var full_attach_opening: float = FOUNDATION_FULL_ATTACH_OPENING
-## Upward peel-back angle at tear start (radians, clockwise = up/back).
+## Upward peel-back angle at the end of the sticky/resistance phase (radians).
 @export_range(0.2, 1.0, 0.01) var peel_rot_start: float = FOUNDATION_PEEL_ROT_START
 ## Upward peel-back angle when fully peeled and still attached.
 @export_range(0.6, 1.6, 0.01) var peel_rot_end: float = FOUNDATION_PEEL_ROT_END
+## Opening fraction with delayed rotation (foil resists before lifting freely).
+@export_range(0.15, 0.5, 0.01) var rot_delay: float = FOUNDATION_ROT_DELAY
+## Sticky-phase ease-in power (1 = linear, higher = more resistance).
+@export_range(1.0, 4.0, 0.05) var rot_resistance: float = FOUNDATION_ROT_RESISTANCE
+## Foil softness — bend tracks peel % and cursor pull (higher = more follow).
+@export_range(0.0, 1.5, 0.01) var bend_strength: float = FOUNDATION_BEND_STRENGTH
 ## How long the fully-peeled-attached pose is held before detach.
 @export_range(0.2, 1.2, 0.01) var full_peel_hold: float = FOUNDATION_FULL_PEEL_HOLD
 ## How quickly visual progress catches drag progress.
@@ -86,6 +109,10 @@ var _stage: WrapperStage = WrapperStage.CLOSED
 var _detach_tween: Tween
 var _strip_rest_position := Vector2.ZERO
 var _full_peel_hold_remaining := -1.0
+## Soft foil bones: nested from tear tip (hinge) toward the free left end.
+var _bend_bones: Array[Control] = []
+var _bend_rects: Array[TextureRect] = []
+var _bend_atlases: Array[AtlasTexture] = []
 
 
 # ============================================================================
@@ -242,6 +269,9 @@ func reset_peel_tuning_to_foundation() -> void:
 	full_attach_opening = FOUNDATION_FULL_ATTACH_OPENING
 	peel_rot_start = FOUNDATION_PEEL_ROT_START
 	peel_rot_end = FOUNDATION_PEEL_ROT_END
+	rot_delay = FOUNDATION_ROT_DELAY
+	rot_resistance = FOUNDATION_ROT_RESISTANCE
+	bend_strength = FOUNDATION_BEND_STRENGTH
 	full_peel_hold = FOUNDATION_FULL_PEEL_HOLD
 	progress_catchup_rate = FOUNDATION_PROGRESS_CATCHUP_RATE
 	detach_duration = FOUNDATION_DETACH_DURATION
@@ -275,6 +305,38 @@ func _peel_rot_end() -> float:
 	return maxf(clampf(peel_rot_end, 0.6, 1.6), _peel_rot_start() + 0.15)
 
 
+func _rot_delay() -> float:
+	return clampf(rot_delay, 0.15, 0.5)
+
+
+func _rot_resistance() -> float:
+	return clampf(rot_resistance, 1.0, 4.0)
+
+
+func _bend_strength() -> float:
+	return clampf(bend_strength, 0.0, 1.5)
+
+
+## Cursor pull above the pack top — tip curls toward the hand while dragging.
+func _cursor_pull_up() -> float:
+	if not _manual_tear_enabled or not is_inside_tree():
+		return 0.0
+	var mouse := get_local_mouse_position()
+	## Local Y grows downward; values above the pack top are negative.
+	var up := (-mouse.y) / maxf(size.y * 0.45, 1.0)
+	return clampf(up, 0.0, 1.35)
+
+
+## Total foil curl in radians — tracks peel % and mouse pull (tip follows hand).
+func _total_strip_curl(opening: float, peel_rot: float) -> float:
+	var strength := _bend_strength()
+	var from_progress := opening * FOUNDATION_BEND_FROM_PROGRESS * strength
+	var from_cursor := _cursor_pull_up() * FOUNDATION_BEND_FROM_CURSOR * strength
+	## Keep a little curl even while root rotation is still sticky.
+	var from_root := absf(peel_rot) * 0.35 * strength
+	return minf(from_progress + from_cursor + from_root, FOUNDATION_BEND_MAX * strength)
+
+
 func _full_peel_hold() -> float:
 	return clampf(full_peel_hold, 0.2, 1.2)
 
@@ -297,6 +359,22 @@ func _detach_drift() -> Vector2:
 
 func _detach_extra_spin() -> float:
 	return clampf(detach_extra_spin, 0.2, 1.5)
+
+
+## Rotation vs opening: sticky first third, then freer lift (not a linear rigid board).
+func _peel_rotation_for_opening(opening: float) -> float:
+	var o := clampf(opening, 0.0, 1.0)
+	var delay := _rot_delay()
+	var rot_start := _peel_rot_start()
+	var rot_end := _peel_rot_end()
+	var sticky_cap := rot_start * FOUNDATION_STICKY_ROT_FRACTION
+	if o <= delay:
+		var t := o / maxf(delay, 0.001)
+		var sticky := pow(t, _rot_resistance())
+		return lerpf(0.0, sticky_cap, sticky)
+	var t2 := (o - delay) / maxf(1.0 - delay, 0.001)
+	var free_t := 1.0 - pow(1.0 - t2, FOUNDATION_FREE_LIFT_EASE)
+	return lerpf(sticky_cap, rot_end, free_t)
 
 
 # ============================================================================
@@ -383,18 +461,14 @@ func _compute_peel_metrics(progress: float) -> Dictionary:
 		sprite_size = FALLBACK_SPRITE_SIZE
 	var seam_height := sprite_size.y * _seam_ratio()
 	var width: float = sprite_size.x
-	## Tear tip travels left → right across the sealed edge.
+	## Tear tip travels left → right across the sealed edge (unchanged continuous peel).
 	var peel_width := lerpf(width * _min_peel_width_ratio(), width, opening)
 	var is_full_attached := opening >= _full_attach_opening()
 	if is_full_attached:
 		peel_width = width
-	## Peel back / up (clockwise around the tear tip) so the free end rises
-	## above the pack — not down over the face.
-	var rot_start := _peel_rot_start()
-	var rot_end := _peel_rot_end()
-	var peel_rot := lerpf(rot_start, rot_end, opening)
+	var peel_rot := _peel_rotation_for_opening(opening)
 	if is_full_attached:
-		peel_rot = rot_end
+		peel_rot = _peel_rot_end()
 	return {
 		"progress": p,
 		"opening": opening,
@@ -423,6 +497,8 @@ func _apply_closed_wrapper() -> void:
 		_pack_art.show()
 	_top_seal.hide()
 	_top_flap_pivot.hide()
+	_reset_bend_bones()
+	_pack_flap.hide()
 	_pack_flap.modulate = Color.WHITE
 
 
@@ -439,19 +515,23 @@ func _apply_body_geometry(metrics: Dictionary) -> void:
 
 
 func _apply_peel_strip(metrics: Dictionary, full_attached: bool) -> void:
-	## Peeled segment = left → tear tip. Unpeeled remainder stays flush until full.
-	## Hinge is always at the tear tip so peel reads left-to-right, not a wrong-side pivot.
+	## Peeled segment = left → tear tip. Soft bone chain curls the free end.
+	## Root hinge stays on the tear tip so peel still reads left-to-right.
 	var source := _source_size()
 	var width: float = metrics.width
 	var seam_height: float = metrics.seam_height
 	var peel_w: float = metrics.peel_width
 	var peel_rot: float = metrics.peel_rotation
+	var opening: float = metrics.opening
 	var seam := _seam_ratio()
 
-	var peel_src_w := source.x * (peel_w / width)
-	_strip_atlas.region = Rect2(0.0, 0.0, peel_src_w, source.y * seam)
-	if _pack_flap.texture != _strip_atlas:
-		_pack_flap.texture = _strip_atlas
+	var peel_src_w := source.x * (peel_w / maxf(width, 0.001))
+	var seam_src_h := source.y * seam
+
+	_ensure_bend_bones()
+	## Legacy single flap stays hidden; bones own the strip draw.
+	_pack_flap.hide()
+	_pack_flap.modulate = Color.WHITE
 
 	_top_flap_pivot.visible = true
 	_top_flap_pivot.position = Vector2.ZERO
@@ -459,12 +539,10 @@ func _apply_peel_strip(metrics: Dictionary, full_attached: bool) -> void:
 	_top_flap_pivot.pivot_offset = Vector2(peel_w, seam_height)
 	_top_flap_pivot.rotation = peel_rot
 	_top_flap_pivot.scale = Vector2.ONE
+	_top_flap_pivot.modulate = Color.WHITE
 	_strip_rest_position = _top_flap_pivot.position
 
-	_pack_flap.position = Vector2.ZERO
-	_pack_flap.size = Vector2(peel_w, seam_height)
-	_pack_flap.modulate = Color.WHITE
-	_pack_flap.show()
+	_layout_bend_bones(peel_w, seam_height, peel_src_w, seam_src_h, peel_rot, opening)
 
 	if full_attached or peel_w >= width - 0.5:
 		_top_seal.hide()
@@ -472,7 +550,7 @@ func _apply_peel_strip(metrics: Dictionary, full_attached: bool) -> void:
 
 	## Still-attached foil to the right of the tear tip.
 	var remain_w := width - peel_w
-	_seal_atlas.region = Rect2(peel_src_w, 0.0, source.x - peel_src_w, source.y * seam)
+	_seal_atlas.region = Rect2(peel_src_w, 0.0, source.x - peel_src_w, seam_src_h)
 	if _top_seal.texture != _seal_atlas:
 		_top_seal.texture = _seal_atlas
 	_top_seal.position = Vector2(peel_w, 0.0)
@@ -480,6 +558,93 @@ func _apply_peel_strip(metrics: Dictionary, full_attached: bool) -> void:
 	_top_seal.rotation = 0.0
 	_top_seal.modulate = Color.WHITE
 	_top_seal.show()
+
+
+func _ensure_bend_bones() -> void:
+	## Rebuild if bone count changed between foundation tweaks.
+	if _bend_bones.size() == BEND_BONE_COUNT:
+		return
+	for bone in _bend_bones:
+		if is_instance_valid(bone):
+			bone.queue_free()
+	_bend_bones.clear()
+	_bend_rects.clear()
+	_bend_atlases.clear()
+	var parent: Control = _top_flap_pivot
+	for i in BEND_BONE_COUNT:
+		var bone := Control.new()
+		bone.name = "BendBone%d" % i
+		bone.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bone.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		parent.add_child(bone)
+		var rect := TextureRect.new()
+		rect.name = "BendRect%d" % i
+		rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rect.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		rect.stretch_mode = TextureRect.STRETCH_SCALE
+		bone.add_child(rect)
+		var atlas := AtlasTexture.new()
+		_bend_bones.append(bone)
+		_bend_rects.append(rect)
+		_bend_atlases.append(atlas)
+		parent = bone
+
+
+func _layout_bend_bones(
+	peel_w: float,
+	seam_height: float,
+	peel_src_w: float,
+	seam_src_h: float,
+	peel_rot: float,
+	opening: float
+) -> void:
+	var n := BEND_BONE_COUNT
+	var seg_w := peel_w / float(n)
+	var seg_src := peel_src_w / float(n)
+	var curl := _total_strip_curl(opening, peel_rot)
+	## Same sign as root peel so the free tip keeps curling up/back with the hand.
+	var peel_sign := 1.0 if peel_rot >= 0.0 else -1.0
+	if is_equal_approx(peel_rot, 0.0):
+		peel_sign = 1.0
+
+	for i in n:
+		var bone := _bend_bones[i]
+		var rect := _bend_rects[i]
+		var atlas := _bend_atlases[i]
+		bone.visible = true
+		bone.size = Vector2(maxf(seg_w, 1.0), seam_height)
+		bone.pivot_offset = Vector2(bone.size.x, seam_height)
+		if i == 0:
+			## Hinge segment sits against the tear tip (right edge of the strip).
+			bone.position = Vector2(peel_w - seg_w, 0.0)
+		else:
+			## Each child extends left from its parent's free edge.
+			bone.position = Vector2(-seg_w, 0.0)
+		## Nested joint deltas follow a tip-weighted curve (foil leads at the free end).
+		var prev_t := 0.0 if i == 0 else pow(float(i - 1) / float(n - 1), FOUNDATION_BEND_POWER)
+		var curr_t := 0.0 if n <= 1 else pow(float(i) / float(n - 1), FOUNDATION_BEND_POWER)
+		bone.rotation = peel_sign * curl * (curr_t - prev_t)
+		bone.scale = Vector2.ONE
+
+		## Atlas slices right→left match hinge→tip bone order.
+		var src_x := peel_src_w - seg_src * float(i + 1)
+		atlas.atlas = pack_art
+		atlas.region = Rect2(src_x, 0.0, seg_src, seam_src_h)
+		rect.texture = atlas
+		rect.position = Vector2.ZERO
+		rect.size = bone.size
+		rect.modulate = Color.WHITE
+		rect.show()
+
+
+func _reset_bend_bones() -> void:
+	for bone in _bend_bones:
+		if is_instance_valid(bone):
+			bone.rotation = 0.0
+			bone.hide()
+	_top_flap_pivot.modulate = Color.WHITE
+	_pack_flap.modulate = Color.WHITE
 
 
 func _apply_full_attached_pose() -> void:
@@ -532,7 +697,7 @@ func _begin_detach() -> void:
 	_detach_tween.tween_property(
 		_top_flap_pivot, "rotation", start_rot + _detach_extra_spin(), duration
 	)
-	_detach_tween.tween_property(_pack_flap, "modulate:a", 0.0, duration)
+	_detach_tween.tween_property(_top_flap_pivot, "modulate:a", 0.0, duration)
 	_detach_tween.chain().tween_callback(_on_detach_finished)
 
 
@@ -542,6 +707,8 @@ func _on_detach_finished() -> void:
 	_top_flap_pivot.hide()
 	_top_flap_pivot.position = _strip_rest_position
 	_top_flap_pivot.rotation = 0.0
+	_top_flap_pivot.modulate = Color.WHITE
+	_reset_bend_bones()
 	_pack_flap.modulate = Color.WHITE
 	_finish_emitted = true
 	_play_audio(_audio_open)
@@ -572,6 +739,9 @@ func _clear_wrapper_materials() -> void:
 	_pack_art.material = null
 	_top_seal.material = null
 	_pack_flap.material = null
+	for rect in _bend_rects:
+		if is_instance_valid(rect):
+			rect.material = null
 
 
 func _apply_profile_colors() -> void:
@@ -583,13 +753,12 @@ func _apply_profile_colors() -> void:
 	_clear_wrapper_materials()
 	if pack_art:
 		_pack_art.show()
-		## Recover if _ready hid the flap before pack_art was assigned.
-		_pack_flap.show()
 		_pack_label.hide()
 	else:
 		_pack_art.hide()
 		_top_seal.hide()
 		_pack_flap.hide()
+		_reset_bend_bones()
 		_pack_label.show()
 
 
@@ -635,10 +804,12 @@ func _reset_visual_state() -> void:
 	_pack_sprite.rotation = 0.0
 	_pack_sprite.position = _sprite_rest_position
 	_pack_flap.modulate = Color.WHITE
+	_top_flap_pivot.modulate = Color.WHITE
 	_top_flap_pivot.rotation = 0.0
 	_top_flap_pivot.position = Vector2.ZERO
 	_top_seal.rotation = 0.0
 	_top_seal.modulate = Color.WHITE
+	_reset_bend_bones()
 	_cleanup_legacy_runtime_nodes()
 	_update_wrapper_from_progress(0.0)
 	show()
