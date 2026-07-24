@@ -118,7 +118,8 @@ func _refresh_preview() -> void:
 	_preview_scene.setup_profile(
 		_selected_pack.pack_id,
 		_selected_pack.primary_color,
-		_selected_pack.accent_color
+		_selected_pack.accent_color,
+		_selected_pack.pack_art
 	)
 
 
