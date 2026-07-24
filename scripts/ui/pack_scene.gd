@@ -22,15 +22,18 @@ enum WrapperStage {
 ## Locked foundation defaults (Issue #33 approved feel). Tweaks use @export sliders;
 ## values are always clamped so casual edits cannot break the peel contract.
 const FOUNDATION_TOP_SEAM_RATIO := 0.13
-const FOUNDATION_PEEL_START := 0.08
-const FOUNDATION_MIN_PEEL_WIDTH_RATIO := 0.14
-const FOUNDATION_FULL_ATTACH_OPENING := 0.92
+const FOUNDATION_PEEL_START := 0.04
+const FOUNDATION_MIN_PEEL_WIDTH_RATIO := 0.04
+const FOUNDATION_FULL_ATTACH_OPENING := 0.94
+## <1 front-loads tear travel so ~40% and below feel a bit faster; 1.0 stays linear.
+const FOUNDATION_EARLY_PACE_POWER := 0.82
 const FOUNDATION_PEEL_ROT_START := 0.5
 const FOUNDATION_PEEL_ROT_END := 1.12
 const FOUNDATION_FULL_PEEL_HOLD := 0.55
-const FOUNDATION_PROGRESS_CATCHUP_RATE := 2.0
+## Keep visual tear locked to drag % (no laggy catch-up that desyncs the label).
+const FOUNDATION_PROGRESS_CATCHUP_RATE := 10.0
 const FOUNDATION_DETACH_DURATION := 0.6
-const FOUNDATION_DETACH_DRIFT := Vector2(36.0, -160.0)
+const FOUNDATION_DETACH_DRIFT := Vector2(72.0, -140.0)
 const FOUNDATION_DETACH_EXTRA_SPIN := 0.7
 ## First third of opening: rotation stays sticky (resistance) before free lift.
 const FOUNDATION_ROT_DELAY := 0.33
@@ -41,14 +44,41 @@ const FOUNDATION_STICKY_ROT_FRACTION := 0.28
 ## Free-lift ease-out power after the sticky phase.
 const FOUNDATION_FREE_LIFT_EASE := 1.55
 ## Soft foil curl along the peeled strip (bone-chain bend, not a rigid board).
-const FOUNDATION_BEND_STRENGTH := 1.05
+const FOUNDATION_BEND_STRENGTH := 1.0
 const BEND_BONE_COUNT := 5
-## How strongly peel-% drives curl (radians at full open, before mouse boost).
-const FOUNDATION_BEND_FROM_PROGRESS := 1.15
-## Extra tip curl from pulling the cursor above the pack.
-const FOUNDATION_BEND_FROM_CURSOR := 0.95
-const FOUNDATION_BEND_MAX := 2.05
-const FOUNDATION_BEND_POWER := 1.55
+## Early curl floor (radians) — grows linearly toward the end pose with peel %.
+const FOUNDATION_BEND_FROM_PROGRESS := 0.55
+## How strongly the strip aims at the pull cursor (1 = tip points at hand).
+const FOUNDATION_CURSOR_AIM := 1.0
+## Max joint fold — past vertical so the free tip can sit up-right of the hinge.
+const FOUNDATION_BEND_MAX := 2.35
+## Full-peel hold pose: strip hinged at top-right, free tip up-right (~45° diagonal).
+const FOUNDATION_END_POSE_CURL := 2.2
+## Curl eases linearly from this opening toward the end pose (no late skyrocket).
+const FOUNDATION_END_POSE_START := 0.0
+## Higher = sharper fold at the peel joint; free tip stays straighter.
+const FOUNDATION_BEND_POWER := 3.4
+## Kept for compatibility; linear end-pose blend owns late curl now.
+const FOUNDATION_CURL_PEAK_AT := 0.45
+const FOUNDATION_CURL_END_RELAX := 1.0
+## Pixel overlap at the tear tip so strip + seal share foil (kills the hard joint seam).
+const JOINT_OVERLAP_RATIO := 0.04
+## Root peel angle folded into bone curl (hinge stays flat on the pack).
+const ROOT_PEEL_INTO_CURL := 0.2
+## Bone fold sign: positive = free end lifts UP above the pack (screenshots confirm).
+const PEEL_FOLD_SIGN := 1.0
+## Smooth foil curl toward target (kills mouse-noise / aim-threshold jitter).
+const FOUNDATION_CURL_SMOOTH_FAST := 16.0
+## Stronger smoothing while dragging slowly (tremor dominates intentional motion).
+const FOUNDATION_CURL_SMOOTH_SLOW := 5.0
+## Soft visual progress follow while dragging (avoids 1px peel-width stutter).
+const FOUNDATION_PROGRESS_SMOOTH_FAST := 22.0
+const FOUNDATION_PROGRESS_SMOOTH_SLOW := 9.0
+## Aim angle deadzone (radians) — ignore tiny aim wobble while holding/slow pulling.
+const AIM_ANGLE_DEADZONE := 0.045
+## Aim latch distances (hysteresis so curl doesn't flicker on/off near the hinge).
+const AIM_ENGAGE_DIST := 52.0
+const AIM_RELEASE_DIST := 30.0
 
 const FALLBACK_SPRITE_SIZE := Vector2(180.0, 240.0)
 const TEAR_FINISH_VISUAL := 0.995
@@ -59,9 +89,9 @@ const TEAR_FINISH_VISUAL := 0.995
 ## Drag progress before the pack leaves the intact closed pose.
 @export_range(0.0, 0.25, 0.01) var peel_start: float = FOUNDATION_PEEL_START
 ## Left-corner width when the tear first appears.
-@export_range(0.08, 0.35, 0.01) var min_peel_width_ratio: float = FOUNDATION_MIN_PEEL_WIDTH_RATIO
+@export_range(0.02, 0.35, 0.01) var min_peel_width_ratio: float = FOUNDATION_MIN_PEEL_WIDTH_RATIO
 ## Opening amount at which the strip is fully peeled but still attached on the right.
-@export_range(0.75, 0.98, 0.01) var full_attach_opening: float = FOUNDATION_FULL_ATTACH_OPENING
+@export_range(0.75, 0.99, 0.01) var full_attach_opening: float = FOUNDATION_FULL_ATTACH_OPENING
 ## Upward peel-back angle at the end of the sticky/resistance phase (radians).
 @export_range(0.2, 1.0, 0.01) var peel_rot_start: float = FOUNDATION_PEEL_ROT_START
 ## Upward peel-back angle when fully peeled and still attached.
@@ -75,10 +105,10 @@ const TEAR_FINISH_VISUAL := 0.995
 ## How long the fully-peeled-attached pose is held before detach.
 @export_range(0.2, 1.2, 0.01) var full_peel_hold: float = FOUNDATION_FULL_PEEL_HOLD
 ## How quickly visual progress catches drag progress.
-@export_range(0.5, 6.0, 0.1) var progress_catchup_rate: float = FOUNDATION_PROGRESS_CATCHUP_RATE
+@export_range(0.5, 12.0, 0.1) var progress_catchup_rate: float = FOUNDATION_PROGRESS_CATCHUP_RATE
 @export_range(0.25, 1.2, 0.01) var detach_duration: float = FOUNDATION_DETACH_DURATION
 @export var detach_drift: Vector2 = FOUNDATION_DETACH_DRIFT
-@export_range(0.2, 1.5, 0.01) var detach_extra_spin: float = FOUNDATION_DETACH_EXTRA_SPIN
+@export_range(-1.5, 1.5, 0.01) var detach_extra_spin: float = FOUNDATION_DETACH_EXTRA_SPIN
 
 @export_group("Pack Profile")
 @export var profile_id: String = "starter"
@@ -113,6 +143,12 @@ var _full_peel_hold_remaining := -1.0
 var _bend_bones: Array[Control] = []
 var _bend_rects: Array[TextureRect] = []
 var _bend_atlases: Array[AtlasTexture] = []
+var _curl_display := 0.0
+var _aim_latched := false
+var _aim_smoothed := -1.0
+var _frame_delta := 0.0167
+var _progress_speed := 0.0
+var _prev_target_progress := 0.0
 
 
 # ============================================================================
@@ -132,6 +168,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_frame_delta = maxf(delta, 0.0001)
 	if _stage == WrapperStage.DETACHING or _stage == WrapperStage.FINISHED:
 		return
 
@@ -211,6 +248,11 @@ func enable_manual_tear(_highest_rarity: int = 0) -> void:
 	_finish_emitted = false
 	_target_progress = 0.0
 	_visual_progress = 0.0
+	_curl_display = 0.0
+	_aim_latched = false
+	_aim_smoothed = -1.0
+	_progress_speed = 0.0
+	_prev_target_progress = 0.0
 	_tear_controller.reset()
 	_pack_flap.modulate = Color.WHITE
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -290,11 +332,11 @@ func _peel_start() -> float:
 
 
 func _min_peel_width_ratio() -> float:
-	return clampf(min_peel_width_ratio, 0.08, 0.35)
+	return clampf(min_peel_width_ratio, 0.02, 0.35)
 
 
 func _full_attach_opening() -> float:
-	return clampf(full_attach_opening, 0.75, 0.98)
+	return clampf(full_attach_opening, 0.75, 0.99)
 
 
 func _peel_rot_start() -> float:
@@ -317,24 +359,100 @@ func _bend_strength() -> float:
 	return clampf(bend_strength, 0.0, 1.5)
 
 
-## Cursor pull above the pack top — tip curls toward the hand while dragging.
-func _cursor_pull_up() -> float:
+## Cursor aim: radians of upward fold so the free tip points at the pull hand.
+## Only while actively dragging — idle mouse must not change the peel pose.
+## Returns < 0 when there is no usable aim (verify / not dragging).
+func _cursor_aim_radians(peel_w: float, seam_height: float) -> float:
 	if not _manual_tear_enabled or not is_inside_tree():
-		return 0.0
-	var mouse := get_local_mouse_position()
-	## Local Y grows downward; values above the pack top are negative.
-	var up := (-mouse.y) / maxf(size.y * 0.45, 1.0)
-	return clampf(up, 0.0, 1.35)
+		_aim_latched = false
+		_aim_smoothed = -1.0
+		return -1.0
+	if not _tear_controller.is_tracking:
+		_aim_latched = false
+		_aim_smoothed = -1.0
+		return -1.0
+	if _top_flap_pivot == null or not _top_flap_pivot.visible:
+		_aim_latched = false
+		_aim_smoothed = -1.0
+		return -1.0
+	## Hinge sits at the tear tip (right end of the peeled strip).
+	var hinge := Vector2(peel_w, seam_height)
+	var mouse := _top_flap_pivot.get_local_mouse_position()
+	var delta := mouse - hinge
+	var dist := delta.length()
+	## Hysteresis: engage/release at different distances so aim doesn't flicker.
+	if _aim_latched:
+		if dist < AIM_RELEASE_DIST:
+			_aim_latched = false
+			_aim_smoothed = -1.0
+			return -1.0
+	elif dist < AIM_ENGAGE_DIST:
+		return -1.0
+	else:
+		_aim_latched = true
+	## Rest strip points left from the hinge. Godot CCW-to-up is negative;
+	## our +PEEL_FOLD_SIGN lifts up, so invert.
+	var lift := clampf(-Vector2.LEFT.angle_to(delta), 0.0, FOUNDATION_BEND_MAX)
+	## Deadzone + smooth: slow pulls wobble the angle every frame otherwise.
+	if _aim_smoothed < 0.0:
+		_aim_smoothed = lift
+	elif absf(lift - _aim_smoothed) <= AIM_ANGLE_DEADZONE:
+		lift = _aim_smoothed
+	else:
+		var aim_blend := 1.0 - exp(-8.0 * _frame_delta)
+		_aim_smoothed = lerpf(_aim_smoothed, lift, clampf(aim_blend, 0.0, 1.0))
+		lift = _aim_smoothed
+	_aim_smoothed = lift
+	return lift
 
 
-## Total foil curl in radians — tracks peel % and mouse pull (tip follows hand).
-func _total_strip_curl(opening: float, peel_rot: float) -> float:
+## Mid-peel pull is strong; near the end settle to a lifted resting fold (still UP, not sagging).
+func _curl_envelope(opening: float) -> float:
+	var o := clampf(opening, 0.0, 1.0)
+	var peak := clampf(FOUNDATION_CURL_PEAK_AT, 0.2, 0.85)
+	if o <= peak:
+		return smoothstep(0.0, peak, o)
+	var t := (o - peak) / maxf(1.0 - peak, 0.001)
+	return lerpf(1.0, FOUNDATION_CURL_END_RELAX, smoothstep(0.0, 1.0, t))
+
+
+## Target foil curl before smoothing.
+func _target_strip_curl(opening: float, peel_rot: float, peel_w: float, seam_height: float) -> float:
 	var strength := _bend_strength()
-	var from_progress := opening * FOUNDATION_BEND_FROM_PROGRESS * strength
-	var from_cursor := _cursor_pull_up() * FOUNDATION_BEND_FROM_CURSOR * strength
-	## Keep a little curl even while root rotation is still sticky.
-	var from_root := absf(peel_rot) * 0.35 * strength
-	return minf(from_progress + from_cursor + from_root, FOUNDATION_BEND_MAX * strength)
+	var o := clampf(opening, 0.0, 1.0)
+	var early := (
+		o * FOUNDATION_BEND_FROM_PROGRESS + absf(peel_rot) * ROOT_PEEL_INTO_CURL
+	) * strength
+	var end_pose := clampf(FOUNDATION_END_POSE_CURL, 1.2, FOUNDATION_BEND_MAX) * maxf(strength, 0.75)
+	var end_start := clampf(FOUNDATION_END_POSE_START, 0.0, 0.85)
+	var t := 0.0
+	if o > end_start:
+		t = (o - end_start) / maxf(1.0 - end_start, 0.001)
+	var curl := lerpf(early, end_pose, clampf(t, 0.0, 1.0))
+
+	## Idle cursor / hover must not reshape the strip — only an active drag pull.
+	var aim := _cursor_aim_radians(peel_w, seam_height)
+	if aim >= 0.0:
+		var follow := aim * FOUNDATION_CURSOR_AIM * maxf(strength, 0.75)
+		curl = maxf(curl, follow)
+	return minf(curl, FOUNDATION_BEND_MAX)
+
+
+## Smoothed foil curl — pulls harder filter when drag is slow (tremor dominates).
+func _total_strip_curl(opening: float, peel_rot: float, peel_w: float, seam_height: float) -> float:
+	var target := _target_strip_curl(opening, peel_rot, peel_w, seam_height)
+	if not _manual_tear_enabled or _stage == WrapperStage.FULL_PEEL:
+		_curl_display = target
+		return target
+	var speed_t := clampf(_progress_speed / 0.4, 0.0, 1.0)
+	var rate := lerpf(FOUNDATION_CURL_SMOOTH_SLOW, FOUNDATION_CURL_SMOOTH_FAST, speed_t)
+	var blend := 1.0 - exp(-rate * _frame_delta)
+	_curl_display = lerpf(_curl_display, target, clampf(blend, 0.0, 1.0))
+	return _curl_display
+
+
+func _joint_overlap_px(width: float, peel_w: float) -> float:
+	return minf(width * JOINT_OVERLAP_RATIO, maxf(peel_w * 0.22, 2.0))
 
 
 func _full_peel_hold() -> float:
@@ -342,7 +460,7 @@ func _full_peel_hold() -> float:
 
 
 func _progress_catchup_rate() -> float:
-	return clampf(progress_catchup_rate, 0.5, 6.0)
+	return clampf(progress_catchup_rate, 0.5, 12.0)
 
 
 func _detach_duration() -> float:
@@ -358,7 +476,11 @@ func _detach_drift() -> Vector2:
 
 
 func _detach_extra_spin() -> float:
-	return clampf(detach_extra_spin, 0.2, 1.5)
+	## Keep detach spin in the upward peel direction (same sign as PEEL_FOLD_SIGN).
+	var spin := clampf(detach_extra_spin, -1.5, 1.5)
+	if spin * PEEL_FOLD_SIGN < 0.0:
+		spin = absf(spin) * PEEL_FOLD_SIGN
+	return spin
 
 
 ## Rotation vs opening: sticky first third, then freer lift (not a linear rigid board).
@@ -415,6 +537,21 @@ func _on_gui_input(event: InputEvent) -> void:
 
 
 func _tick_progress(delta: float) -> void:
+	## Track how fast the drag % is changing (slow pulls need heavier smoothing).
+	_progress_speed = absf(_target_progress - _prev_target_progress) / maxf(delta, 0.0001)
+	_prev_target_progress = _target_progress
+	if _tear_controller.is_tracking:
+		## Soft follow — hard lockstep made slow 1px advances look like peel-width jitter.
+		var speed_t := clampf(_progress_speed / 0.4, 0.0, 1.0)
+		var rate := lerpf(
+			FOUNDATION_PROGRESS_SMOOTH_SLOW, FOUNDATION_PROGRESS_SMOOTH_FAST, speed_t
+		)
+		var blend := 1.0 - exp(-rate * delta)
+		_visual_progress = lerpf(_visual_progress, _target_progress, clampf(blend, 0.0, 1.0))
+		## Never lag too far behind an intentional drag.
+		if _target_progress - _visual_progress > 0.06:
+			_visual_progress = _target_progress - 0.06
+		return
 	_visual_progress = move_toward(
 		_visual_progress, _target_progress, delta * _progress_catchup_rate()
 	)
@@ -456,22 +593,27 @@ func _compute_peel_metrics(progress: float) -> Dictionary:
 	var p := clampf(progress, 0.0, 1.0)
 	var start := _peel_start()
 	var opening := clampf((p - start) / maxf(1.0 - start, 0.001), 0.0, 1.0)
+	## Mild ease-out: early % covers a bit more seal; end still lands at full width.
+	var paced := _paced_opening(opening)
 	var sprite_size := _pack_sprite.size
 	if sprite_size.x < 1.0 or sprite_size.y < 1.0:
 		sprite_size = FALLBACK_SPRITE_SIZE
 	var seam_height := sprite_size.y * _seam_ratio()
 	var width: float = sprite_size.x
-	## Tear tip travels left → right across the sealed edge (unchanged continuous peel).
-	var peel_width := lerpf(width * _min_peel_width_ratio(), width, opening)
+	## Tear tip travels left → right (paced so low % feels slightly quicker).
+	var peel_width := width * paced
+	if opening > 0.0:
+		## Tiny visible tip only — avoid the old big jump that made early peel feel stuck.
+		peel_width = maxf(peel_width, width * _min_peel_width_ratio())
 	var is_full_attached := opening >= _full_attach_opening()
 	if is_full_attached:
 		peel_width = width
-	var peel_rot := _peel_rotation_for_opening(opening)
+	var peel_rot := _peel_rotation_for_opening(paced)
 	if is_full_attached:
 		peel_rot = _peel_rot_end()
 	return {
 		"progress": p,
-		"opening": opening,
+		"opening": paced,
 		"seam_height": seam_height,
 		"width": width,
 		"height": sprite_size.y,
@@ -479,6 +621,14 @@ func _compute_peel_metrics(progress: float) -> Dictionary:
 		"peel_rotation": peel_rot,
 		"is_full_attached": is_full_attached,
 	}
+
+
+## Front-load tear travel a little under ~40%; identity at 0 and 1.
+func _paced_opening(opening: float) -> float:
+	var o := clampf(opening, 0.0, 1.0)
+	if o <= 0.0:
+		return 0.0
+	return pow(o, FOUNDATION_EARLY_PACE_POWER)
 
 
 func _reset_pack_sprite_transform() -> void:
@@ -490,6 +640,9 @@ func _reset_pack_sprite_transform() -> void:
 
 func _apply_closed_wrapper() -> void:
 	## Frame 1 — intact pack, seal attached, no gap.
+	_curl_display = 0.0
+	_aim_latched = false
+	_aim_smoothed = -1.0
 	if pack_art:
 		_pack_art.texture = pack_art
 		_pack_art.position = Vector2.ZERO
@@ -516,7 +669,7 @@ func _apply_body_geometry(metrics: Dictionary) -> void:
 
 func _apply_peel_strip(metrics: Dictionary, full_attached: bool) -> void:
 	## Peeled segment = left → tear tip. Soft bone chain curls the free end.
-	## Root hinge stays on the tear tip so peel still reads left-to-right.
+	## Hinge bone stays flat on the pack so the joint with TopSeal looks continuous.
 	var source := _source_size()
 	var width: float = metrics.width
 	var seam_height: float = metrics.seam_height
@@ -527,6 +680,8 @@ func _apply_peel_strip(metrics: Dictionary, full_attached: bool) -> void:
 
 	var peel_src_w := source.x * (peel_w / maxf(width, 0.001))
 	var seam_src_h := source.y * seam
+	var overlap := _joint_overlap_px(width, peel_w)
+	var overlap_src := source.x * (overlap / maxf(width, 0.001))
 
 	_ensure_bend_bones()
 	## Legacy single flap stays hidden; bones own the strip draw.
@@ -534,10 +689,12 @@ func _apply_peel_strip(metrics: Dictionary, full_attached: bool) -> void:
 	_pack_flap.modulate = Color.WHITE
 
 	_top_flap_pivot.visible = true
+	_top_flap_pivot.z_index = 5
 	_top_flap_pivot.position = Vector2.ZERO
 	_top_flap_pivot.size = Vector2(peel_w, seam_height)
 	_top_flap_pivot.pivot_offset = Vector2(peel_w, seam_height)
-	_top_flap_pivot.rotation = peel_rot
+	## Keep the tear-tip hinge coplanar with the unpeeled seal (no hard V-gap).
+	_top_flap_pivot.rotation = 0.0
 	_top_flap_pivot.scale = Vector2.ONE
 	_top_flap_pivot.modulate = Color.WHITE
 	_strip_rest_position = _top_flap_pivot.position
@@ -548,13 +705,15 @@ func _apply_peel_strip(metrics: Dictionary, full_attached: bool) -> void:
 		_top_seal.hide()
 		return
 
-	## Still-attached foil to the right of the tear tip.
-	var remain_w := width - peel_w
-	_seal_atlas.region = Rect2(peel_src_w, 0.0, source.x - peel_src_w, seam_src_h)
+	## Unpeeled seal underlaps the hinge bone so foil textures meet seamlessly.
+	var seal_start := maxf(peel_w - overlap, 0.0)
+	var seal_src_start := maxf(peel_src_w - overlap_src, 0.0)
+	_seal_atlas.region = Rect2(seal_src_start, 0.0, source.x - seal_src_start, seam_src_h)
 	if _top_seal.texture != _seal_atlas:
 		_top_seal.texture = _seal_atlas
-	_top_seal.position = Vector2(peel_w, 0.0)
-	_top_seal.size = Vector2(remain_w, seam_height)
+	_top_seal.z_index = 4
+	_top_seal.position = Vector2(seal_start, 0.0)
+	_top_seal.size = Vector2(width - seal_start, seam_height)
 	_top_seal.rotation = 0.0
 	_top_seal.modulate = Color.WHITE
 	_top_seal.show()
@@ -602,11 +761,9 @@ func _layout_bend_bones(
 	var n := BEND_BONE_COUNT
 	var seg_w := peel_w / float(n)
 	var seg_src := peel_src_w / float(n)
-	var curl := _total_strip_curl(opening, peel_rot)
-	## Same sign as root peel so the free tip keeps curling up/back with the hand.
-	var peel_sign := 1.0 if peel_rot >= 0.0 else -1.0
-	if is_equal_approx(peel_rot, 0.0):
-		peel_sign = 1.0
+	var curl := _total_strip_curl(opening, peel_rot, peel_w, seam_height)
+	## Positive fold lifts the free end up/back above the pack (green-line pose).
+	var peel_sign := PEEL_FOLD_SIGN
 
 	for i in n:
 		var bone := _bend_bones[i]
@@ -616,15 +773,15 @@ func _layout_bend_bones(
 		bone.size = Vector2(maxf(seg_w, 1.0), seam_height)
 		bone.pivot_offset = Vector2(bone.size.x, seam_height)
 		if i == 0:
-			## Hinge segment sits against the tear tip (right edge of the strip).
+			## Flush overlap with TopSeal — continuous foil at the tear tip.
 			bone.position = Vector2(peel_w - seg_w, 0.0)
+			bone.rotation = 0.0
 		else:
-			## Each child extends left from its parent's free edge.
+			## Child extends left; fold is hinge-weighted (max bend at joint, taut tip).
 			bone.position = Vector2(-seg_w, 0.0)
-		## Nested joint deltas follow a tip-weighted curve (foil leads at the free end).
-		var prev_t := 0.0 if i == 0 else pow(float(i - 1) / float(n - 1), FOUNDATION_BEND_POWER)
-		var curr_t := 0.0 if n <= 1 else pow(float(i) / float(n - 1), FOUNDATION_BEND_POWER)
-		bone.rotation = peel_sign * curl * (curr_t - prev_t)
+			var prev_cum := _hinge_fold_cum(i - 1, n)
+			var curr_cum := _hinge_fold_cum(i, n)
+			bone.rotation = peel_sign * curl * (curr_cum - prev_cum)
 		bone.scale = Vector2.ONE
 
 		## Atlas slices right→left match hinge→tip bone order.
@@ -636,6 +793,14 @@ func _layout_bend_bones(
 		rect.size = bone.size
 		rect.modulate = Color.WHITE
 		rect.show()
+
+
+## Cumulative fold from joint → tip: most bend at the peel front, tip stays straight.
+func _hinge_fold_cum(i: int, n: int) -> float:
+	if n <= 1:
+		return 1.0
+	var t := clampf(float(i) / float(n - 1), 0.0, 1.0)
+	return 1.0 - pow(1.0 - t, FOUNDATION_BEND_POWER)
 
 
 func _reset_bend_bones() -> void:
@@ -654,6 +819,7 @@ func _apply_full_attached_pose() -> void:
 	_ensure_atlases()
 	_apply_body_geometry(metrics)
 	_stage = WrapperStage.FULL_PEEL
+	_curl_display = clampf(FOUNDATION_END_POSE_CURL, 1.2, FOUNDATION_BEND_MAX)
 	_apply_peel_strip(metrics, true)
 
 
@@ -795,6 +961,11 @@ func _cleanup_legacy_runtime_nodes() -> void:
 func _reset_visual_state() -> void:
 	_kill_detach_tween()
 	_full_peel_hold_remaining = -1.0
+	_curl_display = 0.0
+	_aim_latched = false
+	_aim_smoothed = -1.0
+	_progress_speed = 0.0
+	_prev_target_progress = 0.0
 	_stage = WrapperStage.CLOSED
 	_finish_emitted = false
 	modulate = Color.WHITE

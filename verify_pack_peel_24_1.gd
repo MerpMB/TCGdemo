@@ -11,6 +11,18 @@ func _strip_visible(flap_pivot: Control) -> bool:
 	return false
 
 
+func _chain_curl_sum(flap_pivot: Control) -> float:
+	var sum := 0.0
+	var path := "BendBone0"
+	for i in 8:
+		var bone := flap_pivot.get_node_or_null(path) as Control
+		if bone == null:
+			break
+		sum += absf(bone.rotation)
+		path = "%s/BendBone%d" % [path, i + 1]
+	return sum
+
+
 func _initialize() -> void:
 	var packed := load("res://scenes/Pack.tscn") as PackedScene
 	var pack := packed.instantiate() as PackScene
@@ -60,11 +72,11 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	## Early peel — tear advances, but rotation stays sticky (first-third delay).
+	## Early peel — tear advances; hinge stays flat (seamless joint with seal).
 	pack.call("_apply_physical_peel", 0.22)
 	await process_frame
 	var early_w: float = flap_pivot.size.x
-	var early_rot: float = absf(flap_pivot.rotation)
+	var early_curl: float = _chain_curl_sum(flap_pivot)
 	if pack.get_wrapper_stage() != PackScene.WrapperStage.PEELING:
 		push_error("24.1 FAIL early: stage not PEELING.")
 		quit(1)
@@ -77,7 +89,7 @@ func _initialize() -> void:
 		push_error("24.1 FAIL early: unpeeled right seal must stay flush.")
 		quit(1)
 		return
-	## Soft bone chain should curl the free tip more than the hinge segment.
+	## Soft bone chain should curl the free tip; hinge bone stays glued flat.
 	var hinge_bone := flap_pivot.get_node_or_null("BendBone0") as Control
 	var tip_bone := flap_pivot.get_node_or_null(
 		"BendBone0/BendBone1/BendBone2/BendBone3/BendBone4"
@@ -86,8 +98,17 @@ func _initialize() -> void:
 		push_error("24.1 FAIL early: bend bone chain missing.")
 		quit(1)
 		return
-	if absf(tip_bone.rotation) + 0.001 < absf(hinge_bone.rotation):
-		push_error("24.1 FAIL early: tip should curl at least as much as hinge bone.")
+	if absf(hinge_bone.rotation) > 0.001:
+		push_error("24.1 FAIL early: hinge bone must stay flat for seamless joint.")
+		quit(1)
+		return
+	if absf(flap_pivot.rotation) > 0.001:
+		push_error("24.1 FAIL early: root hinge must stay coplanar with seal.")
+		quit(1)
+		return
+	## Seal underlaps the strip at the tear tip (no hard cut).
+	if seal.position.x > early_w - 1.0:
+		push_error("24.1 FAIL early: seal must underlap hinge for seamless joint.")
 		quit(1)
 		return
 	if early_w > sprite.size.x * 0.45:
@@ -106,17 +127,12 @@ func _initialize() -> void:
 		push_error("24.1 FAIL early: strip detached while peeling.")
 		quit(1)
 		return
-	## First-third resistance: rotation must stay subdued while tear still advances.
-	if early_rot > 0.22:
-		push_error("24.1 FAIL early: rotation not delayed (rot=%s)." % early_rot)
-		quit(1)
-		return
 
-	## Mid peel — tear progressed left → right; free lift begins after sticky phase.
+	## Mid peel — tear progressed left → right; tip curl grows with peel %.
 	pack.call("_apply_physical_peel", 0.55)
 	await process_frame
 	var mid_w: float = flap_pivot.size.x
-	var mid_rot: float = absf(flap_pivot.rotation)
+	var mid_curl: float = _chain_curl_sum(flap_pivot)
 	if pack.get_wrapper_stage() != PackScene.WrapperStage.PEELING:
 		push_error("24.1 FAIL mid: stage not PEELING.")
 		quit(1)
@@ -137,8 +153,8 @@ func _initialize() -> void:
 		push_error("24.1 FAIL mid: hinge not following tear tip.")
 		quit(1)
 		return
-	if mid_rot <= early_rot + 0.08:
-		push_error("24.1 FAIL mid: free lift did not increase after resistance (e=%s m=%s)." % [early_rot, mid_rot])
+	if mid_curl <= early_curl + 0.08:
+		push_error("24.1 FAIL mid: foil curl did not grow with peel (e=%s m=%s)." % [early_curl, mid_curl])
 		quit(1)
 		return
 	if flap_pivot.position.length() > 0.5 or flap_pivot.modulate.a < 0.99:
@@ -165,8 +181,8 @@ func _initialize() -> void:
 		push_error("24.1 FAIL Frame3: must be attached at far right (pivot=%s)." % flap_pivot.pivot_offset)
 		quit(1)
 		return
-	if absf(flap_pivot.rotation) < 1.0:
-		push_error("24.1 FAIL Frame3: full peel not lifted enough (rot=%s)." % flap_pivot.rotation)
+	if absf(flap_pivot.rotation) > 0.001:
+		push_error("24.1 FAIL Frame3: root hinge must stay flat (seamless attachment).")
 		quit(1)
 		return
 	if flap_pivot.position.length() > 0.5:
@@ -184,18 +200,37 @@ func _initialize() -> void:
 	tip_bone = flap_pivot.get_node_or_null(
 		"BendBone0/BendBone1/BendBone2/BendBone3/BendBone4"
 	) as Control
+	var fold_bone := flap_pivot.get_node_or_null("BendBone0/BendBone1") as Control
 	hinge_bone = flap_pivot.get_node_or_null("BendBone0") as Control
-	if tip_bone == null or hinge_bone == null:
+	if tip_bone == null or fold_bone == null or hinge_bone == null:
 		push_error("24.1 FAIL Frame3: bend bone chain missing.")
 		quit(1)
 		return
-	## Tip joint should carry a clear share of peel-% curl (not a rigid board).
-	if absf(tip_bone.rotation) < 0.12:
-		push_error("24.1 FAIL Frame3: tip curl too weak to read as foil bend (rot=%s)." % tip_bone.rotation)
+	if absf(hinge_bone.rotation) > 0.001:
+		push_error("24.1 FAIL Frame3: hinge bone must stay flat.")
 		quit(1)
 		return
-	if absf(tip_bone.rotation) <= absf(hinge_bone.rotation) + 0.02:
-		push_error("24.1 FAIL Frame3: foil bend not curling toward free tip.")
+	## Most bend at the joint/fold; free tip stays nearer original/straight shape.
+	## Fold must lift UP (positive rotation), never sag down over the pack.
+	if fold_bone.rotation < 0.08:
+		push_error("24.1 FAIL Frame3: joint fold must lift upward (rot=%s)." % fold_bone.rotation)
+		quit(1)
+		return
+	if absf(tip_bone.rotation) >= absf(fold_bone.rotation) * 0.55:
+		push_error(
+			"24.1 FAIL Frame3: tip should stay straighter than joint fold (fold=%s tip=%s)."
+			% [fold_bone.rotation, tip_bone.rotation]
+		)
+		quit(1)
+		return
+	var end_curl := _chain_curl_sum(flap_pivot)
+	## End pose must fold past vertical into the up-right park region.
+	if end_curl < 1.4:
+		push_error("24.1 FAIL Frame3: end peel must park up-right (curl=%s)." % end_curl)
+		quit(1)
+		return
+	if fold_bone.rotation < 0.7:
+		push_error("24.1 FAIL Frame3: end joint fold too shallow for park pose (rot=%s)." % fold_bone.rotation)
 		quit(1)
 		return
 
@@ -210,6 +245,10 @@ func _initialize() -> void:
 		return
 	if flap_pivot.position.length() > 0.5:
 		push_error("24.1 FAIL hold: detached during attached hold.")
+		quit(1)
+		return
+	if flap_pivot.modulate.a < 0.99:
+		push_error("24.1 FAIL hold: faded during attached hold.")
 		quit(1)
 		return
 
